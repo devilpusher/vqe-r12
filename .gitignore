@@ -23,10 +23,20 @@ htmlcov/
 *.out
 *_summary.txt
 *.csv
+timer.dat
+
+# Generated workflow reports
+he_*.json
+step3*_*.json
+step6a_slater_fit_N*.json
+step6a_slater_fit_N*.txt
+step6b*_fit_convergence.json
+step6b*_fit_convergence.txt
+step6b_slater_scan.json
+step6b_slater_scan.txt
 
 # Local editor and OS files
 .idea/
 .vscode/
 .DS_Store
 Thumbs.db
-

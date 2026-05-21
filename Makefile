@@ -11,9 +11,12 @@ SCRIPTS := \
 	step4b_he_parent_obs_fci_rdm_check.py \
 	step5a_he_r12_intermediate_check.py \
 	step5b_he_r12_prototype_correction.py \
-	step5c_he_correction_comparison.py
+	step5c_he_correction_comparison.py \
+	step6a_fit_slater_corr.py \
+	step6b_collect_fit_convergence.py \
+	step6b_scan_slater_pipeline.py
 
-.PHONY: env update-env check step1 step2 step3 step4b step5a step5b step5c clean
+.PHONY: env update-env check step1 step2 step3 step4b step5a step5b step5c step6a step6b clean
 
 env:
 	conda env create -f environment.yml
@@ -45,6 +48,11 @@ step5b:
 step5c:
 	$(PYTHON) step5c_he_correction_comparison.py
 
-clean:
-	rm -f *.npz *.npy *.out *_summary.txt *.csv
+step6a:
+	$(PYTHON) step6a_fit_slater_corr.py
 
+step6b:
+	$(PYTHON) step6b_collect_fit_convergence.py
+
+clean:
+	rm -f *.npz *.npy *.out *_summary.txt *.csv step6a_slater_fit_N*.json step6b*_fit_convergence.json step6b*_fit_convergence.txt step6b_slater_scan.json step6b_slater_scan.txt

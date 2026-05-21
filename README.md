@@ -15,6 +15,9 @@ RDM, CABS+, F12/R12 integral, and prototype correction workflows.
 - `step5a_he_r12_intermediate_check.py` builds R12 intermediates.
 - `step5b_he_r12_prototype_correction.py` evaluates a prototype R12 correction.
 - `step5c_he_correction_comparison.py` compares correction results.
+- `step6a_fit_slater_corr.py` fits a Slater-type F12 factor by Gaussian expansion.
+- `step6b_collect_fit_convergence.py` runs/collects fitted Slater convergence through the prototype pipeline.
+- `step6b_scan_slater_pipeline.py` performs exploratory fit-protocol scans.
 
 ## Environment
 
@@ -49,7 +52,8 @@ python step4b_he_parent_obs_fci_rdm_check.py
 python step5a_he_r12_intermediate_check.py
 python step5b_he_r12_prototype_correction.py
 python step5c_he_correction_comparison.py
+python step6a_fit_slater_corr.py
+python step6b_collect_fit_convergence.py
 ```
 
 Generated `.npz`, `.out`, summary, and comparison files are ignored by Git.
-
