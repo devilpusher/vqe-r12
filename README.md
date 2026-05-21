@@ -18,6 +18,7 @@ RDM, CABS+, F12/R12 integral, and prototype correction workflows.
 - `step6a_fit_slater_corr.py` fits a Slater-type F12 factor by Gaussian expansion.
 - `step6b_collect_fit_convergence.py` runs/collects fitted Slater convergence through the prototype pipeline.
 - `step6b_scan_slater_pipeline.py` performs exploratory fit-protocol scans.
+- `step6c_he_r12_approxc_sp_contraction.py` evaluates the first approximation-C/SP contraction prototype.
 
 ## Environment
 
@@ -54,6 +55,7 @@ python step5b_he_r12_prototype_correction.py
 python step5c_he_correction_comparison.py
 python step6a_fit_slater_corr.py
 python step6b_collect_fit_convergence.py
+python step6c_he_r12_approxc_sp_contraction.py
 ```
 
 Generated `.npz`, `.out`, summary, and comparison files are ignored by Git.

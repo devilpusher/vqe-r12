@@ -106,6 +106,54 @@ def q_project_pair_amplitude(A: np.ndarray, nobs: int) -> np.ndarray:
     return out
 
 
+def build_pair_hamiltonian(h: np.ndarray, eri: np.ndarray) -> np.ndarray:
+    """Ordered alpha-beta pair Hamiltonian used by Step 5b diagnostics."""
+    n = h.shape[0]
+    H = np.zeros((n * n, n * n), dtype=float)
+    for p in range(n):
+        for q in range(n):
+            I = p * n + q
+            for r in range(n):
+                for s in range(n):
+                    J = r * n + s
+                    val = 0.0
+                    if q == s:
+                        val += h[p, r]
+                    if p == r:
+                        val += h[q, s]
+                    val += eri[p, r, q, s]
+                    H[I, J] = val
+    return sym(H)
+
+
+def build_pair_fock_operator(F: np.ndarray) -> np.ndarray:
+    """Ordered pair-space operator F(1)+F(2)."""
+    n = F.shape[0]
+    return np.kron(F, np.eye(n)) + np.kron(np.eye(n), F)
+
+
+def q_pair_indices(nri: int, nobs: int) -> np.ndarray:
+    idx = []
+    for p in range(nri):
+        for q in range(nri):
+            if not (p < nobs and q < nobs):
+                idx.append(p * nri + q)
+    return np.array(idx, dtype=int)
+
+
+def pp_pair_indices(nri: int, nobs: int) -> np.ndarray:
+    idx = []
+    for p in range(nobs):
+        for q in range(nobs):
+            idx.append(p * nri + q)
+    return np.array(idx, dtype=int)
+
+
+def two_body_expectation(T: np.ndarray, dm2: np.ndarray) -> float:
+    """Return 1/2 sum_pqrs T[p,q,r,s] dm2[p,q,r,s]."""
+    return float(0.5 * np.einsum("pqrs,pqrs", T, dm2, optimize=True))
+
+
 def rdm_diagnostics(dm1: np.ndarray, dm2: np.ndarray) -> Dict[str, Any]:
     occ = np.linalg.eigvalsh(sym(dm1))[::-1]
     return {
@@ -128,4 +176,3 @@ def tensor_diagnostics(T: np.ndarray) -> Dict[str, Any]:
         "pair_bra_error": maxabs(T - T.transpose(1, 0, 2, 3)),
         "pair_ket_error": maxabs(T - T.transpose(0, 1, 3, 2)),
     }
-
