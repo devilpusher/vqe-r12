@@ -23,6 +23,7 @@ RDM, CABS+, F12/R12 integral, and prototype correction workflows.
 - `step6e_build_vxbc_intermediates.py` builds explicit V/X/B/C intermediate matrices for approximation-C diagnostics.
 - `step6f_he_r12_candidate_energy.py` writes a He-only candidate [2]R12 energy ledger from direct F12 tensors.
 - `step6g_audit_approxc_terms.py` audits approximation-C/SP tilde terms, denominators, and prefactor variants.
+- `step6h_correlation_factor_sign_probe.py` checks correlation-factor sign conventions.
 
 ## Environment
 
@@ -64,6 +65,7 @@ python step6d_formula_projector_audit.py
 python step6e_build_vxbc_intermediates.py
 python step6f_he_r12_candidate_energy.py
 python step6g_audit_approxc_terms.py
+python step6h_correlation_factor_sign_probe.py
 ```
 
 Generated `.npz`, `.out`, summary, and comparison files are ignored by Git.

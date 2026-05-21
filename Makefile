@@ -19,9 +19,10 @@ SCRIPTS := \
 	step6d_formula_projector_audit.py \
 	step6e_build_vxbc_intermediates.py \
 	step6f_he_r12_candidate_energy.py \
-	step6g_audit_approxc_terms.py
+	step6g_audit_approxc_terms.py \
+	step6h_correlation_factor_sign_probe.py
 
-.PHONY: env update-env check step1 step2 step3 step4b step5a step5b step5c step6a step6b step6c step6d step6e step6f step6g clean
+.PHONY: env update-env check step1 step2 step3 step4b step5a step5b step5c step6a step6b step6c step6d step6e step6f step6g step6h clean
 
 env:
 	conda env create -f environment.yml
@@ -73,6 +74,9 @@ step6f:
 
 step6g:
 	$(PYTHON) step6g_audit_approxc_terms.py
+
+step6h:
+	$(PYTHON) step6h_correlation_factor_sign_probe.py
 
 clean:
 	rm -f *.npz *.npy *.out *_summary.txt *.csv step6a_slater_fit_N*.json step6b*_fit_convergence.json step6b*_fit_convergence.txt step6b_slater_scan.json step6b_slater_scan.txt
