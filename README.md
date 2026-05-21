@@ -19,6 +19,8 @@ RDM, CABS+, F12/R12 integral, and prototype correction workflows.
 - `step6b_collect_fit_convergence.py` runs/collects fitted Slater convergence through the prototype pipeline.
 - `step6b_scan_slater_pipeline.py` performs exploratory fit-protocol scans.
 - `step6c_he_r12_approxc_sp_contraction.py` evaluates the first approximation-C/SP contraction prototype.
+- `step6d_formula_projector_audit.py` records the formula map and audits Ansatz-3 projector subtraction.
+- `step6e_build_vxbc_intermediates.py` builds explicit V/X/B/C intermediate matrices for approximation-C diagnostics.
 
 ## Environment
 
@@ -56,6 +58,8 @@ python step5c_he_correction_comparison.py
 python step6a_fit_slater_corr.py
 python step6b_collect_fit_convergence.py
 python step6c_he_r12_approxc_sp_contraction.py
+python step6d_formula_projector_audit.py
+python step6e_build_vxbc_intermediates.py
 ```
 
 Generated `.npz`, `.out`, summary, and comparison files are ignored by Git.

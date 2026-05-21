@@ -15,9 +15,11 @@ SCRIPTS := \
 	step6a_fit_slater_corr.py \
 	step6b_collect_fit_convergence.py \
 	step6b_scan_slater_pipeline.py \
-	step6c_he_r12_approxc_sp_contraction.py
+	step6c_he_r12_approxc_sp_contraction.py \
+	step6d_formula_projector_audit.py \
+	step6e_build_vxbc_intermediates.py
 
-.PHONY: env update-env check step1 step2 step3 step4b step5a step5b step5c step6a step6b step6c clean
+.PHONY: env update-env check step1 step2 step3 step4b step5a step5b step5c step6a step6b step6c step6d step6e clean
 
 env:
 	conda env create -f environment.yml
@@ -57,6 +59,12 @@ step6b:
 
 step6c:
 	$(PYTHON) step6c_he_r12_approxc_sp_contraction.py
+
+step6d:
+	$(PYTHON) step6d_formula_projector_audit.py
+
+step6e:
+	$(PYTHON) step6e_build_vxbc_intermediates.py
 
 clean:
 	rm -f *.npz *.npy *.out *_summary.txt *.csv step6a_slater_fit_N*.json step6b*_fit_convergence.json step6b*_fit_convergence.txt step6b_slater_scan.json step6b_slater_scan.txt
