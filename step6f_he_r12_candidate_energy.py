@@ -27,12 +27,20 @@ from r12_common import (
     assert_finite,
     maxabs,
     pair_matrix,
-    pair_projector,
     reconstruct_energy,
     rdm_diagnostics,
     tensor_diagnostics,
 )
 from step6e_build_vxbc_intermediates import ansatz3_indices, build_intermediate_matrices, default_prefix, source_vectors
+from step6g_audit_approxc_terms import (
+    ab_space_indices,
+    build_formula_matrices,
+    build_tilde_terms,
+    energy_components,
+    make_unit_pair,
+    orbital_energy_audit,
+    pair_index,
+)
 
 
 def parse_args():
@@ -176,6 +184,69 @@ def candidate_rows(
     return rows
 
 
+def audited_3c_fix_sp_row(
+    data,
+    nri: int,
+    nobs: int,
+    nocc: int,
+    E_obs: float,
+    E_full: Optional[float],
+    thresh: float,
+) -> Dict[str, Any]:
+    if nocc != 1:
+        raise RuntimeError("audited_3C_FIX_SP candidate currently supports the He nocc=1 case only.")
+
+    F_ri = np.array(data["F_ri"], dtype=float)
+    eps_info = orbital_energy_audit(F_ri, nobs, nocc)
+    eps = np.array(eps_info["eps_diag"], dtype=float)
+    built = build_formula_matrices(data, nri, nobs, nocc)
+    spaces = ab_space_indices(nri, nobs, nocc)
+    ab_idx = spaces["ri_external"]
+    kl_idx = np.array([pair_index(k, l, nri) for k in range(nocc) for l in range(nocc)], dtype=int)
+    terms = build_tilde_terms(
+        built["matrices"],
+        eps,
+        i=0,
+        j=0,
+        kl_indices=kl_idx,
+        ab_indices=ab_idx,
+        n=nri,
+        thresh=thresh,
+        B_source="B_fock_q3",
+    )
+    T_sp = make_unit_pair(nocc, 0, 0, 0.5)
+    comp = energy_components(T_sp, terms)
+    metrics = energy_metrics(comp["delta_E_candidate"], E_obs, E_full)
+    V_tilde_norm = float(np.linalg.norm(terms["V_tilde"]))
+    B_tilde_norm = float(np.linalg.norm(terms["B_tilde"]))
+    return {
+        "source": "audited_3C_FIX_SP",
+        "denominator_model": "tilde_B_fock_q3_ri_external",
+        "denominator_description": "6g audited tilde terms with RI-external ab space and B_fock_q3",
+        "amplitude_model": "SP_fixed_3/8_plus_1/8",
+        "V_direct": float(terms["V_block"][0]) if terms["V_block"].size else 0.0,
+        "X_direct": float(terms["X_block"][0, 0]) if terms["X_block"].size else 0.0,
+        "B_dc_direct": 0.0,
+        "C_fock_model": float(np.linalg.norm(terms["C_kl_ab"])),
+        "denominator": float(terms["B_tilde"][0, 0]) if terms["B_tilde"].size else 0.0,
+        "lambda": 1.0,
+        "delta_E": comp["delta_E_candidate"],
+        "linear_2T_Vtilde": comp["linear_2T_Vtilde"],
+        "quadratic_T_Btilde_T": comp["quadratic_T_Btilde_T"],
+        "V_tilde_norm": V_tilde_norm,
+        "B_tilde_norm": B_tilde_norm,
+        "C_kl_ab_norm": float(np.linalg.norm(terms["C_kl_ab"])),
+        "C_over_den_V_norm": float(np.linalg.norm(terms["C_over_den_V"])),
+        "C_over_den_B_norm": float(np.linalg.norm(terms["C_over_den_B"])),
+        "ab_space": "ri_external",
+        "B_source": "B_fock_q3",
+        "occupied_pair_block": [[0, 0]],
+        "n_skipped_denominators": int(terms["n_skipped_denominators"]),
+        "epsilon_source": eps_info["epsilon_source"],
+        **metrics,
+    }
+
+
 def finite_checks(arrays: Dict[str, np.ndarray]) -> None:
     for name, arr in arrays.items():
         assert_finite(name, arr)
@@ -271,6 +342,8 @@ def main():
     ints = build_intermediate_matrices(data, nri, nobs, nocc)
     sources = source_vectors(data, nri, nobs, ints["indices"]["q_ansatz3"])
     rows = candidate_rows(sources, ints["matrices"], E_obs, E_full, args.denom_thresh)
+    audited_row = audited_3c_fix_sp_row(data, nri, nobs, nocc, E_obs, E_full, args.denom_thresh)
+    rows.append(audited_row)
     warnings = bool_warn(rows, args.overrecover_tol)
     closest = closest_rows(rows)
 
@@ -313,12 +386,14 @@ def main():
         "direct_tensor_consistency": direct_consistency,
         "projector_dimensions": projector_dims,
         "candidate_rows": rows,
+        "audited_3C_FIX_SP": audited_row,
         "closest_rows_by_abs_residual_mEh": closest,
         "warnings": warnings,
         "important_note": (
             "Step 6f is a He-only candidate-energy ledger using direct f12g12/f12sq/f12dc "
-            "tensors as authoritative inputs. Rows involving C_fock_model are denominator "
-            "diagnostics, not the final approximation-C C_ab/orbital-energy tilde terms."
+            "tensors as authoritative inputs. The audited_3C_FIX_SP row uses the Step-6g "
+            "B_fock_q3 + tilde V/B + occupied-pair-block path. Other rows involving "
+            "C_fock_model remain denominator diagnostics."
         ),
     }
 
@@ -341,6 +416,15 @@ def main():
         "abs_residual_to_full_mEh",
         "recovery_ratio",
         "overcorrection",
+        "linear_2T_Vtilde",
+        "quadratic_T_Btilde_T",
+        "V_tilde_norm",
+        "B_tilde_norm",
+        "C_kl_ab_norm",
+        "C_over_den_V_norm",
+        "C_over_den_B_norm",
+        "ab_space",
+        "B_source",
     ]
     with open(args.csv, "w", newline="", encoding="utf-8") as f:
         writer = csv.DictWriter(f, fieldnames=fieldnames)
@@ -372,6 +456,23 @@ def main():
     lines.append(
         "max|direct f12sq  - f*f closure| = "
         f"{direct_consistency['maxabs_direct_f12sq_minus_ff_full_closure']:.3e}"
+    )
+    lines.append("")
+    lines.append("[Audited 3C(FIX)/SP row]")
+    lines.append("| source | ab space | B source | linear 2T.Vt | quad T.Bt.T | DeltaE / Eh | residual / mEh | recovery | flag |")
+    lines.append("|---|---|---|---:|---:|---:|---:|---:|---|")
+    flag = ""
+    if audited_row["overcorrection"] is True:
+        flag = "over"
+    elif audited_row["recovery_ratio"] is not None and audited_row["recovery_ratio"] < 0.0:
+        flag = "wrong-sign"
+    lines.append(
+        f"| {audited_row['source']} | {audited_row['ab_space']} | {audited_row['B_source']} "
+        f"| {fmt(audited_row['linear_2T_Vtilde'])} "
+        f"| {fmt(audited_row['quadratic_T_Btilde_T'])} "
+        f"| {fmt(audited_row['delta_E'])} "
+        f"| {fmt(audited_row['abs_residual_to_full_mEh'], 6)} "
+        f"| {fmt(audited_row['recovery_ratio'], 6)} | {flag} |"
     )
     lines.append("")
     lines.append("[Candidate energy rows]")
