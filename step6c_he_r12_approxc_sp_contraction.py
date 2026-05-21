@@ -54,6 +54,7 @@ def parse_args():
     p.add_argument("--inp", default="he_ccpvdz_nobs2_fitN7_step5a_r12_intermediates.npz")
     p.add_argument("--out", default=None)
     p.add_argument("--summary", default=None)
+    p.add_argument("--nocc", type=int, default=1, help="Closed-shell occupied spatial orbitals for SR-F12 formula audit.")
     p.add_argument("--eig-thresh", type=float, default=1e-10)
     p.add_argument("--max-pair-dim", type=int, default=5000)
     return p.parse_args()
@@ -139,6 +140,132 @@ def vector_alignment(a: np.ndarray, b: np.ndarray) -> Dict[str, Any]:
     nb = float(np.linalg.norm(b))
     cos = None if na == 0.0 or nb == 0.0 else float((a @ b) / (na * nb))
     return {"norm_a": na, "norm_b": nb, "dot": float(a @ b), "cosine": cos}
+
+
+def ansatz3_projector_masks(nri: int, nobs: int, nocc: int) -> Dict[str, Any]:
+    """Build ordered-pair masks matching the Psi4 Ansatz-3 projector labels.
+
+    For closed-shell SR-F12 notation:
+        i,j = occupied OBS orbitals
+        a,b = virtual OBS orbitals
+        a',b' = CABS/external RI complement
+        r,s = all OBS orbitals
+
+    Psi4 Eq. (6): Q12 = 1 - |a'j><a'j| - |ib'><ib'| - |rs><rs|.
+    """
+    pairs = [(p, q) for p in range(nri) for q in range(nri)]
+    obs = set(range(nobs))
+    occ = set(range(nocc))
+    cabs = set(range(nobs, nri))
+
+    rs_obs = []
+    cabs_occ_left = []
+    occ_cabs_right = []
+    q_ansatz3 = []
+    for idx, (p, q) in enumerate(pairs):
+        is_rs = p in obs and q in obs
+        is_a_prime_j = p in cabs and q in occ
+        is_i_b_prime = p in occ and q in cabs
+        if is_rs:
+            rs_obs.append(idx)
+        if is_a_prime_j:
+            cabs_occ_left.append(idx)
+        if is_i_b_prime:
+            occ_cabs_right.append(idx)
+        if not (is_rs or is_a_prime_j or is_i_b_prime):
+            q_ansatz3.append(idx)
+
+    return {
+        "rs_obs": np.array(rs_obs, dtype=int),
+        "a_prime_j": np.array(cabs_occ_left, dtype=int),
+        "i_b_prime": np.array(occ_cabs_right, dtype=int),
+        "q_ansatz3": np.array(q_ansatz3, dtype=int),
+        "dimensions": {
+            "nri_pair_dim": nri * nri,
+            "nobs": nobs,
+            "nocc": nocc,
+            "n_obs_virtual": max(nobs - nocc, 0),
+            "n_cabs": nri - nobs,
+            "n_rs_obs": len(rs_obs),
+            "n_a_prime_j": len(cabs_occ_left),
+            "n_i_b_prime": len(occ_cabs_right),
+            "n_q_ansatz3": len(q_ansatz3),
+        },
+    }
+
+
+def projector_subtraction_diagnostics(
+    eri_ri: np.ndarray,
+    f12_ri: np.ndarray,
+    f12sq_ri: np.ndarray,
+    f12g12_ri: np.ndarray,
+    nri: int,
+    nobs: int,
+    nocc: int,
+) -> Dict[str, Any]:
+    """Compare direct 3C projector subtraction patterns with Psi4 direct integrals."""
+    masks = ansatz3_projector_masks(nri, nobs, nocc)
+    G = pair_matrix(eri_ri)
+    F = pair_matrix(f12_ri)
+    F2 = pair_matrix(f12sq_ri)
+    GF = pair_matrix(f12g12_ri)
+
+    def P(label: str) -> np.ndarray:
+        return pair_projector(nri, masks[label])
+
+    P_a_j = P("a_prime_j")
+    P_i_b = P("i_b_prime")
+    P_rs = P("rs_obs")
+    P_q3 = pair_projector(nri, masks["q_ansatz3"])
+
+    V_3c_matrix = GF - G @ P_a_j @ F - G @ P_i_b @ F - G @ P_rs @ F
+    X_3c_matrix = F2 - F @ P_i_b @ F - F @ P_a_j @ F - F @ P_rs @ F
+    V_q3_closure = G @ P_q3 @ F
+    X_q3_closure = F @ P_q3 @ F
+
+    return {
+        "masks": {
+            key: value.tolist() if isinstance(value, np.ndarray) else value
+            for key, value in masks.items()
+        },
+        "errors": {
+            "maxabs_V_3c_matrix_minus_gQf_closure": maxabs(V_3c_matrix - V_q3_closure),
+            "maxabs_X_3c_matrix_minus_fQf_closure": maxabs(X_3c_matrix - X_q3_closure),
+            "maxabs_gf_direct_minus_gf_closure_full": maxabs(GF - G @ F),
+            "maxabs_f2_direct_minus_ff_closure_full": maxabs(F2 - F @ F),
+        },
+        "norms": {
+            "V_3c_matrix": float(np.linalg.norm(V_3c_matrix)),
+            "X_3c_matrix": float(np.linalg.norm(X_3c_matrix)),
+            "V_q3_closure": float(np.linalg.norm(V_q3_closure)),
+            "X_q3_closure": float(np.linalg.norm(X_q3_closure)),
+        },
+        "matrices": {
+            "V_3c_matrix": V_3c_matrix,
+            "X_3c_matrix": X_3c_matrix,
+            "V_q3_closure": V_q3_closure,
+            "X_q3_closure": X_q3_closure,
+        },
+    }
+
+
+def formula_audit_summary() -> Dict[str, Any]:
+    return {
+        "source": "Psi4 MP2-F12 theory documentation, equations (2)-(11)",
+        "projector_ansatz3": "Q12 = 1 - |a'j><a'j| - |ib'><ib'| - |rs><rs|",
+        "sp_fixed_amplitude": "T_kl^ij = 3/8 delta_ik delta_jl + 1/8 delta_jk delta_il",
+        "residual": "R_kl^ij = V_kl^ij + C_ab^kl T_ab^ij + [B_kl,mn - (eps_i+eps_j) X_kl,mn] T_mn^ij",
+        "energy": "Delta E_F12/3C(FIX) = T_kl^ij (2 Vtilde_kl^ij + Btilde_kl,mn^ij T_mn^ij)",
+        "tilde_terms": {
+            "Vtilde": "V - C_ab^kl G_ab^ij / (eps_a + eps_b - eps_i - eps_j)",
+            "Btilde": "B - (eps_i+eps_j)X - C_ab^mn C_ab^kl / (eps_a + eps_b - eps_i - eps_j)",
+        },
+        "current_limitations": [
+            "Current He prototype uses OBS-FCI/RDM pair data, not a strict SR-MP2 occupied-pair residual.",
+            "C_ab coupling and orbital-energy denominator terms are not fully implemented yet.",
+            "Direct Psi4 f12g12/f12sq tensors are not equivalent to finite RI matrix closure G@F/F@F.",
+        ],
+    }
 
 
 def f12_intermediate_contractions(
@@ -307,6 +434,16 @@ def main():
     H_pair = build_pair_hamiltonian(h_ri, eri_ri)
     K_pair = build_pair_fock_operator(F_ri)
     qidx = q_pair_indices(nri, nobs)
+    sr_formula_audit = formula_audit_summary()
+    projector_audit = projector_subtraction_diagnostics(
+        eri_ri=eri_ri,
+        f12_ri=f12_ri,
+        f12sq_ri=f12sq_ri,
+        f12g12_ri=f12g12_ri,
+        nri=nri,
+        nobs=nobs,
+        nocc=args.nocc,
+    )
 
     # Full-H is the Step-5b reference.  Fock-denominator rows are the new 6c
     # approximation-C/SP contraction prototype.
@@ -385,6 +522,11 @@ def main():
             "f12dc_ri": tensor_diagnostics(f12dc_ri),
         },
         "f12_expectations": f12_expectations,
+        "sr_formula_audit": sr_formula_audit,
+        "projector_subtraction_audit": {
+            key: value for key, value in projector_audit.items()
+            if key != "matrices"
+        },
         "f12_approxc_intermediates": f12_approxc,
         "contractions": contractions,
         "qsolve_reference": {k: v for k, v in qsolve_H.items() if k not in ["x_Q", "b_Q"]},
@@ -411,6 +553,10 @@ def main():
         args.out,
         H_pair=H_pair,
         K_pair_fock=K_pair,
+        V_3c_projector_matrix=projector_audit["matrices"]["V_3c_matrix"],
+        X_3c_projector_matrix=projector_audit["matrices"]["X_3c_matrix"],
+        V_q3_closure_matrix=projector_audit["matrices"]["V_q3_closure"],
+        X_q3_closure_matrix=projector_audit["matrices"]["X_q3_closure"],
         qidx=qidx,
         psi0_pair=psi0,
         Cab_sp_pair=cab_sp,
@@ -468,6 +614,23 @@ def main():
             f"| {fmt(block['DeltaE_minus_V2_over_X_minus_dc'])} "
             f"| {fmt(block['DeltaE_minus_V2_over_dc_only'])} |"
         )
+    lines.append("")
+    lines.append("[Formula audit: SR-MP2-F12 3C(FIX)/SP]")
+    lines.append(f"source      : {sr_formula_audit['source']}")
+    lines.append(f"projector   : {sr_formula_audit['projector_ansatz3']}")
+    lines.append(f"SP amplitude: {sr_formula_audit['sp_fixed_amplitude']}")
+    dims = projector_audit["masks"]["dimensions"]
+    lines.append(
+        "projector dimensions: "
+        f"pair={dims['nri_pair_dim']}, OBS={dims['nobs']}, occ={dims['nocc']}, "
+        f"CABS={dims['n_cabs']}, Q3={dims['n_q_ansatz3']}"
+    )
+    pe = projector_audit["errors"]
+    lines.append(f"max|V_3C matrix - gQ3f closure| = {pe['maxabs_V_3c_matrix_minus_gQf_closure']:.3e}")
+    lines.append(f"max|X_3C matrix - fQ3f closure| = {pe['maxabs_X_3c_matrix_minus_fQf_closure']:.3e}")
+    lines.append(f"max|direct f12g12 - full g*f closure| = {pe['maxabs_gf_direct_minus_gf_closure_full']:.3e}")
+    lines.append(f"max|direct f12sq  - full f*f closure| = {pe['maxabs_f2_direct_minus_ff_closure_full']:.3e}")
+    lines.append("missing terms before final 3C(FIX): C_ab coupling/orbital-energy denominator and exact tilde prefactors.")
     lines.append("")
     lines.append("[Reminder]")
     lines.append(diagnostics["important_note"])
