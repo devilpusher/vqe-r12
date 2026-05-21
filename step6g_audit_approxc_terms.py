@@ -227,6 +227,178 @@ def build_tilde_terms(
     }
 
 
+def convention_variant_rows(
+    matrices: Dict[str, np.ndarray],
+    eps: np.ndarray,
+    i: int,
+    j: int,
+    kl_indices: np.ndarray,
+    ab_indices: np.ndarray,
+    n: int,
+    thresh: float,
+) -> Dict[str, Any]:
+    V = matrices["V_q3_projector_subtracted"]
+    X = matrices["X_q3_projector_subtracted"]
+    C = matrices["C_q3_fock_coupling"]
+    G = matrices["G"]
+    B = matrices["B_fock_q3"]
+    eps_ij = float(eps[i] + eps[j])
+    ij_idx = pair_index(i, j, n)
+    T_sp = make_unit_pair(len(kl_indices), 0, 0, 0.5)
+
+    V_block = V[np.ix_([ij_idx], kl_indices)].reshape(len(kl_indices))
+    X_block = X[np.ix_(kl_indices, kl_indices)]
+    B_block = B[np.ix_(kl_indices, kl_indices)]
+    C_kl_ab = C[np.ix_(kl_indices, ab_indices)]
+    G_ij_ab = G[np.ix_([ij_idx], ab_indices)].reshape(len(ab_indices))
+    G_ab_ij = G[np.ix_(ab_indices, [ij_idx])].reshape(len(ab_indices))
+
+    def correction_terms(C_eff: np.ndarray, G_eff: np.ndarray, denom_sign: float):
+        Cg = np.zeros_like(V_block)
+        Cc = np.zeros_like(B_block)
+        skipped = 0
+        for col, ab in enumerate(ab_indices):
+            a = int(ab // n)
+            b = int(ab % n)
+            den = denom_sign * float(eps[a] + eps[b] - eps[i] - eps[j])
+            if abs(den) <= thresh:
+                skipped += 1
+                continue
+            Cg += C_eff[:, col] * G_eff[col] / den
+            Cc += np.outer(C_eff[:, col], C_eff[:, col]) / den
+        return Cg, Cc, skipped
+
+    variants = [
+        {
+            "name": "formula_baseline",
+            "description": "Psi4-doc literal: V-CG/den, B-epsijX-CC/den, +energy, +T",
+            "f12_linear_sign": 1.0,
+            "denom_sign": 1.0,
+            "v_correction_sign": -1.0,
+            "b_correction_sign": -1.0,
+            "energy_sign": 1.0,
+            "T_sign": 1.0,
+            "G_orientation": "ij_ab",
+        },
+        {
+            "name": "G_bra_ket_swapped",
+            "description": "Use G[ab,ij] instead of G[ij,ab] in V_tilde.",
+            "f12_linear_sign": 1.0,
+            "denom_sign": 1.0,
+            "v_correction_sign": -1.0,
+            "b_correction_sign": -1.0,
+            "energy_sign": 1.0,
+            "T_sign": 1.0,
+            "G_orientation": "ab_ij",
+        },
+        {
+            "name": "V_plus_CG_over_den",
+            "description": "Flip only the V_tilde C*G correction sign.",
+            "f12_linear_sign": 1.0,
+            "denom_sign": 1.0,
+            "v_correction_sign": 1.0,
+            "b_correction_sign": -1.0,
+            "energy_sign": 1.0,
+            "T_sign": 1.0,
+            "G_orientation": "ij_ab",
+        },
+        {
+            "name": "denominator_reversed",
+            "description": "Use eps_i+eps_j-eps_a-eps_b in both tilde corrections.",
+            "f12_linear_sign": 1.0,
+            "denom_sign": -1.0,
+            "v_correction_sign": -1.0,
+            "b_correction_sign": -1.0,
+            "energy_sign": 1.0,
+            "T_sign": 1.0,
+            "G_orientation": "ij_ab",
+        },
+        {
+            "name": "overall_energy_minus",
+            "description": "Apply an overall minus sign to the 3C(FIX) energy expression.",
+            "f12_linear_sign": 1.0,
+            "denom_sign": 1.0,
+            "v_correction_sign": -1.0,
+            "b_correction_sign": -1.0,
+            "energy_sign": -1.0,
+            "T_sign": 1.0,
+            "G_orientation": "ij_ab",
+        },
+        {
+            "name": "negative_SP_amplitude",
+            "description": "Use T_SP=-1/2 for the He i=j pair.",
+            "f12_linear_sign": 1.0,
+            "denom_sign": 1.0,
+            "v_correction_sign": -1.0,
+            "b_correction_sign": -1.0,
+            "energy_sign": 1.0,
+            "T_sign": -1.0,
+            "G_orientation": "ij_ab",
+        },
+        {
+            "name": "flip_f12_linear_terms",
+            "description": "Flip all terms linear in f12: V and C, leaving X/B quadratic terms unchanged.",
+            "f12_linear_sign": -1.0,
+            "denom_sign": 1.0,
+            "v_correction_sign": -1.0,
+            "b_correction_sign": -1.0,
+            "energy_sign": 1.0,
+            "T_sign": 1.0,
+            "G_orientation": "ij_ab",
+        },
+        {
+            "name": "flip_f12_linear_and_overall_minus",
+            "description": "Flip f12-linear terms and also apply overall minus sign.",
+            "f12_linear_sign": -1.0,
+            "denom_sign": 1.0,
+            "v_correction_sign": -1.0,
+            "b_correction_sign": -1.0,
+            "energy_sign": -1.0,
+            "T_sign": 1.0,
+            "G_orientation": "ij_ab",
+        },
+    ]
+
+    rows = []
+    for spec in variants:
+        s = spec["f12_linear_sign"]
+        G_eff = G_ij_ab if spec["G_orientation"] == "ij_ab" else G_ab_ij
+        C_eff = s * C_kl_ab
+        Cg, Cc, skipped = correction_terms(C_eff, G_eff, spec["denom_sign"])
+        Vt = s * V_block + spec["v_correction_sign"] * Cg
+        Bt = B_block - eps_ij * X_block + spec["b_correction_sign"] * Cc
+        T = spec["T_sign"] * T_sp
+        linear = float(2.0 * (T @ Vt))
+        quadratic = float(T @ (Bt @ T))
+        delta = spec["energy_sign"] * (linear + quadratic)
+        rows.append({
+            "name": spec["name"],
+            "description": spec["description"],
+            "G_orientation": spec["G_orientation"],
+            "f12_linear_sign": spec["f12_linear_sign"],
+            "denom_sign": spec["denom_sign"],
+            "v_correction_sign": spec["v_correction_sign"],
+            "b_correction_sign": spec["b_correction_sign"],
+            "energy_sign": spec["energy_sign"],
+            "T_sign": spec["T_sign"],
+            "V_tilde": Vt.tolist(),
+            "B_tilde_norm": float(np.linalg.norm(Bt)),
+            "C_over_den_V": Cg.tolist(),
+            "C_over_den_B_norm": float(np.linalg.norm(Cc)),
+            "linear_2T_Vtilde_before_energy_sign": linear,
+            "quadratic_T_Btilde_T_before_energy_sign": quadratic,
+            "delta_E_candidate": delta,
+            "n_skipped_denominators": skipped,
+        })
+
+    rows_sorted = sorted(rows, key=lambda row: abs(row["delta_E_candidate"]))
+    return {
+        "bra_ket_G_maxabs_diff": maxabs(G_ij_ab - G_ab_ij),
+        "rows": rows,
+        "rows_sorted_by_abs_delta": rows_sorted,
+    }
+
+
 def energy_components(T: np.ndarray, terms: Dict[str, Any]) -> Dict[str, float]:
     Vt = terms["V_tilde"]
     Bt = terms["B_tilde"]
@@ -329,6 +501,17 @@ def main():
                 "energy_rows": energy_rows,
             }
 
+    convention_audit = convention_variant_rows(
+        M,
+        eps,
+        i,
+        j,
+        kl_indices,
+        spaces["ri_external"],
+        nri,
+        args.denom_thresh,
+    )
+
     direct_vs_closure = {
         "maxabs_direct_f12g12_minus_G_F12": maxabs(M["GF_direct_full"] - M["G"] @ M["F12"]),
         "maxabs_direct_f12sq_minus_F12_F12": maxabs(M["F2_direct_full"] - M["F12"] @ M["F12"]),
@@ -379,6 +562,7 @@ def main():
             if value.ndim == 2
         },
         "audits": audits,
+        "convention_variant_audit": convention_audit,
         "important_note": (
             "This audit uses direct <gf>, <f^2>, and f12dc tensors as authoritative integral "
             "inputs, but applies Ansatz-3 Q explicitly through projector subtraction/insertions. "
@@ -420,6 +604,7 @@ def main():
     lines.append("[Direct tensor vs finite closure]")
     for key, value in direct_vs_closure.items():
         lines.append(f"{key}: {value:.3e}")
+    lines.append(f"max|G[ij,ab] - G[ab,ij]| in RI-external ab space: {convention_audit['bra_ket_G_maxabs_diff']:.3e}")
     lines.append("")
     lines.append("[Tilde-term energy audit]")
     lines.append("| ab space | B source | T variant | linear 2T.Vt | quad T.Bt.T | DeltaE |")
@@ -431,8 +616,23 @@ def main():
                     f"| {ab_name} | {B_source} | {tname} "
                     f"| {row['linear_2T_Vtilde']:.8e} "
                     f"| {row['quadratic_T_Btilde_T']:.8e} "
-                    f"| {row['delta_E_candidate']:.8e} |"
+                f"| {row['delta_E_candidate']:.8e} |"
                 )
+    lines.append("")
+    lines.append("[Convention/sign variants for ri_external + B_fock_q3 + SP]")
+    lines.append("| variant | G | f12-linear sign | denom sign | V corr sign | B corr sign | energy sign | T sign | DeltaE |")
+    lines.append("|---|---|---:|---:|---:|---:|---:|---:|---:|")
+    for row in convention_audit["rows"]:
+        lines.append(
+            f"| {row['name']} | {row['G_orientation']} | {row['f12_linear_sign']:.0f} "
+            f"| {row['denom_sign']:.0f} | {row['v_correction_sign']:.0f} "
+            f"| {row['b_correction_sign']:.0f} | {row['energy_sign']:.0f} "
+            f"| {row['T_sign']:.0f} | {row['delta_E_candidate']:.8e} |"
+        )
+    lines.append("")
+    lines.append("[Smallest |DeltaE| sign variants]")
+    for row in convention_audit["rows_sorted_by_abs_delta"][:4]:
+        lines.append(f"{row['name']}: DeltaE={row['delta_E_candidate']:.8e} Eh; {row['description']}")
     lines.append("")
     lines.append("[Term norms]")
     for ab_name, audit in audits.items():
