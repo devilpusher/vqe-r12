@@ -154,6 +154,19 @@ def two_body_expectation(T: np.ndarray, dm2: np.ndarray) -> float:
     return float(0.5 * np.einsum("pqrs,pqrs", T, dm2, optimize=True))
 
 
+def pair_matrix(T: np.ndarray) -> np.ndarray:
+    """Flatten T[p,q,r,s] to ordered-pair matrix T[p*n+q, r*n+s]."""
+    n = T.shape[0]
+    return np.asarray(T, dtype=float).reshape(n * n, n * n)
+
+
+def pair_projector(nri: int, indices: np.ndarray) -> np.ndarray:
+    """Diagonal projector in ordered pair space."""
+    P = np.zeros((nri * nri, nri * nri), dtype=float)
+    P[indices, indices] = 1.0
+    return P
+
+
 def rdm_diagnostics(dm1: np.ndarray, dm2: np.ndarray) -> Dict[str, Any]:
     occ = np.linalg.eigvalsh(sym(dm1))[::-1]
     return {

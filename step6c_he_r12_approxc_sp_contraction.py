@@ -37,6 +37,9 @@ from r12_common import (
     build_pair_fock_operator,
     build_pair_hamiltonian,
     maxabs,
+    pair_matrix,
+    pair_projector,
+    pp_pair_indices,
     q_pair_indices,
     reconstruct_energy,
     rdm_diagnostics,
@@ -138,6 +141,94 @@ def vector_alignment(a: np.ndarray, b: np.ndarray) -> Dict[str, Any]:
     return {"norm_a": na, "norm_b": nb, "dot": float(a @ b), "cosine": cos}
 
 
+def f12_intermediate_contractions(
+    eri_ri: np.ndarray,
+    f12_ri: np.ndarray,
+    f12sq_ri: np.ndarray,
+    f12g12_ri: np.ndarray,
+    f12dc_ri: np.ndarray,
+    psi0_vec: np.ndarray,
+    cab_sp_vec: np.ndarray,
+    nobs: int,
+    nri: int,
+    thresh: float,
+) -> Dict[str, Any]:
+    """Build approximation-C-like F12 intermediates in ordered pair space.
+
+    Direct-integral route:
+        V  <- <source| f12g12 |source>
+        X  <- <source| f12sq  |source>
+        DC <- <source| f12dc  |source>
+
+    Matrix-closure route:
+        g Q f and f Q f are also reported as diagnostics.  They are not assumed
+        to equal the direct Psi4 integral tensors; the differences are useful
+        convention/completeness checks for this finite RI prototype.
+    """
+    pidx = pp_pair_indices(nri, nobs)
+    qidx = q_pair_indices(nri, nobs)
+    P = pair_projector(nri, pidx)
+    Q = pair_projector(nri, qidx)
+
+    G = pair_matrix(eri_ri)
+    F = pair_matrix(f12_ri)
+    F2 = pair_matrix(f12sq_ri)
+    GF_direct = pair_matrix(f12g12_ri)
+    DC = pair_matrix(f12dc_ri)
+
+    V_Q_matrix = G @ Q @ F
+    X_Q_matrix = F @ Q @ F
+    V_full_matrix = G @ F
+    X_full_matrix = F @ F
+
+    def scalar(M: np.ndarray, left: np.ndarray, right: np.ndarray) -> float:
+        return float(left @ (M @ right))
+
+    out: Dict[str, Any] = {
+        "matrix_consistency": {
+            "maxabs_GF_matrix_minus_f12g12_integral": maxabs(V_full_matrix - GF_direct),
+            "maxabs_FF_matrix_minus_f12sq_integral": maxabs(X_full_matrix - F2),
+            "maxabs_DC_asym": maxabs(DC - DC.T),
+        },
+        "reference": {},
+        "sp": {},
+    }
+
+    for label, source in [("reference", psi0_vec), ("sp", cab_sp_vec)]:
+        V = scalar(GF_direct, source, source)
+        X = scalar(F2, source, source)
+        DCq = scalar(DC, source, source)
+        V_matrix_Q = scalar(V_Q_matrix, psi0_vec, source)
+        X_matrix_Q = scalar(X_Q_matrix, source, source)
+        B_plus = X + DCq
+        B_minus = X - DCq
+        B_dc_only = DCq
+
+        rows = {
+            "V_f12g12_direct": V,
+            "X_f12sq_direct": X,
+            "B_f12dc_direct": DCq,
+            "V_gQf_matrix_closure": V_matrix_Q,
+            "X_fQf_matrix_closure": X_matrix_Q,
+            "B_X_plus_dc": B_plus,
+            "B_X_minus_dc": B_minus,
+            "B_dc_only": B_dc_only,
+        }
+        for denom_name, denom in [
+            ("X_plus_dc", B_plus),
+            ("X_minus_dc", B_minus),
+            ("dc_only", B_dc_only),
+            ("X_only", X),
+        ]:
+            if abs(denom) > thresh:
+                rows[f"DeltaE_minus_V2_over_{denom_name}"] = -V * V / denom
+            else:
+                rows[f"DeltaE_minus_V2_over_{denom_name}"] = None
+        out[label] = rows
+
+    return out
+
+
 def main():
     args = parse_args()
     prefix = default_prefix(args.inp)
@@ -204,6 +295,12 @@ def main():
     psi0 = np.zeros((nri, nri), dtype=float)
     psi0[:nobs, :nobs] = Cab_obs
     psi0_vec = psi0.reshape(-1)
+    cab_sp = np.zeros((nri, nri), dtype=float)
+    if "Cab_sp" in data:
+        cab_sp[:nobs, :nobs] = np.array(data["Cab_sp"], dtype=float)
+    else:
+        cab_sp[:nobs, :nobs] = Cab_obs
+    cab_sp_vec = cab_sp.reshape(-1)
     A_raw_vec = A_raw_Q.reshape(-1)
     A_sp_vec = A_sp_Q.reshape(-1)
 
@@ -235,6 +332,19 @@ def main():
         "f12g12": two_body_expectation(f12g12_ri, dm2_ri),
         "f12dc": two_body_expectation(f12dc_ri, dm2_ri),
     }
+
+    f12_approxc = f12_intermediate_contractions(
+        eri_ri=eri_ri,
+        f12_ri=f12_ri,
+        f12sq_ri=f12sq_ri,
+        f12g12_ri=f12g12_ri,
+        f12dc_ri=f12dc_ri,
+        psi0_vec=psi0_vec,
+        cab_sp_vec=cab_sp_vec,
+        nobs=nobs,
+        nri=nri,
+        thresh=args.eig_thresh,
+    )
 
     corrected_total_energies = {}
     for key, value in contractions.items():
@@ -275,6 +385,7 @@ def main():
             "f12dc_ri": tensor_diagnostics(f12dc_ri),
         },
         "f12_expectations": f12_expectations,
+        "f12_approxc_intermediates": f12_approxc,
         "contractions": contractions,
         "qsolve_reference": {k: v for k, v in qsolve_H.items() if k not in ["x_Q", "b_Q"]},
         "qsolve_fock_model": {k: v for k, v in qsolve_F.items() if k not in ["x_Q", "b_Q"]},
@@ -289,6 +400,9 @@ def main():
             "Step 6c is an approximation-C/SP contraction prototype. "
             "Rows using the full pair Hamiltonian are retained as diagnostics. "
             "Rows using F(1)+F(2) are the current generalized-Fock denominator model. "
+            "The f12_approxc_intermediates block now includes gQf, fQf, and fdc contractions "
+            "built from f12g12, f12sq, and f12dc tensors; final prefactors/exchange terms "
+            "still need literature-level auditing. "
             "This is not yet the final article-level [2]R12 tensor formula."
         ),
     }
@@ -299,6 +413,7 @@ def main():
         K_pair_fock=K_pair,
         qidx=qidx,
         psi0_pair=psi0,
+        Cab_sp_pair=cab_sp,
         A_raw_Q=A_raw_Q,
         A_sp_Q=A_sp_Q,
         x_full_H=xH.reshape(nri, nri),
@@ -337,6 +452,23 @@ def main():
     for key, value in f12_expectations.items():
         lines.append(f"<{key}> = {value:.12e}")
     lines.append("")
+    lines.append("[Approximation-C-like F12 intermediate contractions]")
+    chk = f12_approxc["matrix_consistency"]
+    lines.append(f"max|g*f matrix closure - f12g12 integral| = {chk['maxabs_GF_matrix_minus_f12g12_integral']:.3e}")
+    lines.append(f"max|f*f matrix closure - f12sq integral|  = {chk['maxabs_FF_matrix_minus_f12sq_integral']:.3e}")
+    lines.append("| source | V=<f12g12> | X=<f12sq> | B=<f12dc> | -V^2/(X+dc) | -V^2/(X-dc) | -V^2/dc |")
+    lines.append("|---|---:|---:|---:|---:|---:|---:|")
+    for label in ["reference", "sp"]:
+        block = f12_approxc[label]
+        def fmt(x):
+            return "" if x is None else f"{x:.8e}"
+        lines.append(
+            f"| {label} | {block['V_f12g12_direct']:.8e} | {block['X_f12sq_direct']:.8e} | {block['B_f12dc_direct']:.8e} "
+            f"| {fmt(block['DeltaE_minus_V2_over_X_plus_dc'])} "
+            f"| {fmt(block['DeltaE_minus_V2_over_X_minus_dc'])} "
+            f"| {fmt(block['DeltaE_minus_V2_over_dc_only'])} |"
+        )
+    lines.append("")
     lines.append("[Reminder]")
     lines.append(diagnostics["important_note"])
 
@@ -367,4 +499,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-
