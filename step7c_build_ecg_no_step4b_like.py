@@ -35,6 +35,7 @@ from step4b_he_parent_obs_fci_rdm_check import (
     asarray_psi4,
     compute_parent_integrals,
     construct_parent_cabs_plus,
+    ensure_4d_tensor,
     parse_corr,
     rdms_from_ab_pair,
     solve_two_electron_ab_fci,
@@ -77,6 +78,7 @@ def parse_args():
     p.add_argument("--energy-tol", type=float, default=1e-9)
     p.add_argument("--orth-tol", type=float, default=1e-8)
     p.add_argument("--save-compressed", action="store_true", help="Use np.savez_compressed. Smaller but slower.")
+    p.add_argument("--r12-only", action="store_true", help="Skip f12sq/f12g12/f12dc; build only tensors needed by Step7d.")
     return p.parse_args()
 
 
@@ -131,7 +133,11 @@ def build_psi4_parent(name: str, basis_text: str, memory: str, nthreads: int, ou
         raise RuntimeError("Cannot import psi4. Activate the Psi4 environment first.") from exc
 
     psi4.core.clean()
-    psi4.set_memory(memory)
+    try:
+        memory_value = float(memory)
+    except ValueError:
+        memory_value = memory
+    psi4.set_memory(memory_value)
     psi4.set_num_threads(nthreads)
     psi4.core.set_output_file(output_file, False)
     mol = psi4.geometry(
@@ -147,6 +153,22 @@ def build_psi4_parent(name: str, basis_text: str, memory: str, nthreads: int, ou
     wfn = psi4.core.Wavefunction.build(mol, psi4.core.get_global_option("BASIS"))
     mints = psi4.core.MintsHelper(wfn.basisset())
     return mol, wfn, mints
+
+
+def compute_parent_integrals_for_step7c(wfn, mints, corr, r12_only: bool) -> Dict[str, np.ndarray]:
+    if not r12_only:
+        return compute_parent_integrals(wfn, mints, corr)
+
+    nao = int(wfn.basisset().nbf())
+    S = asarray_psi4(mints.ao_overlap())
+    T = asarray_psi4(mints.ao_kinetic())
+    V = asarray_psi4(mints.ao_potential())
+    return {
+        "S": S,
+        "h": T + V,
+        "eri": ensure_4d_tensor(mints.ao_eri(), nao, "ao_eri"),
+        "f12": ensure_4d_tensor(mints.ao_f12(corr), nao, "ao_f12"),
+    }
 
 
 def check_finite_many(arrays: Dict[str, np.ndarray]) -> None:
@@ -209,7 +231,7 @@ def main():
         )
 
     corr, corr_info = get_corr(args)
-    ao = compute_parent_integrals(wfn, mints, corr)
+    ao = compute_parent_integrals_for_step7c(wfn, mints, corr, args.r12_only)
     cabs_info = construct_parent_cabs_plus(C_obs, ao["S"], args.thresh)
     C_cabs = cabs_info["C_cabs"]
     C_ri = cabs_info["C_ri"]
@@ -225,9 +247,9 @@ def main():
     h_ri = transform_1index(ao["h"], C_ri)
     eri_ri = symmetrize_bra_ket(transform_4index(ao["eri"], C_ri))
     f12_ri = symmetrize_bra_ket(transform_4index(ao["f12"], C_ri))
-    f12sq_ri = symmetrize_bra_ket(transform_4index(ao["f12sq"], C_ri))
-    f12g12_ri = symmetrize_bra_ket(transform_4index(ao["f12g12"], C_ri))
-    f12dc_ri = symmetrize_bra_ket(transform_4index(ao["f12dc"], C_ri))
+    f12sq_ri = None if args.r12_only else symmetrize_bra_ket(transform_4index(ao["f12sq"], C_ri))
+    f12g12_ri = None if args.r12_only else symmetrize_bra_ket(transform_4index(ao["f12g12"], C_ri))
+    f12dc_ri = None if args.r12_only else symmetrize_bra_ket(transform_4index(ao["f12dc"], C_ri))
     dm1_ri, dm2_ri = embed_rdm_to_ri(dm1_obs, dm2_obs, nri=nri, nobs=nobs)
     E_ri_rdm, E1_ri, E2_ri = reconstruct_energy(h_ri, eri_ri, dm1_ri, dm2_ri, enuc=enuc)
 
@@ -236,10 +258,15 @@ def main():
     tensor_diags = {
         "eri_ri": tensor_diagnostics(eri_ri),
         "f12_ri": tensor_diagnostics(f12_ri),
-        "f12sq_ri": tensor_diagnostics(f12sq_ri),
-        "f12g12_ri": tensor_diagnostics(f12g12_ri),
-        "f12dc_ri": tensor_diagnostics(f12dc_ri),
     }
+    if not args.r12_only:
+        tensor_diags.update(
+            {
+                "f12sq_ri": tensor_diagnostics(f12sq_ri),
+                "f12g12_ri": tensor_diagnostics(f12g12_ri),
+                "f12dc_ri": tensor_diagnostics(f12dc_ri),
+            }
+        )
     check_finite_many(
         {
             "h_obs": h_obs,
@@ -247,15 +274,14 @@ def main():
             "h_ri": h_ri,
             "eri_ri": eri_ri,
             "f12_ri": f12_ri,
-            "f12sq_ri": f12sq_ri,
-            "f12g12_ri": f12g12_ri,
-            "f12dc_ri": f12dc_ri,
             "dm1_obs": dm1_obs,
             "dm2_obs": dm2_obs,
             "dm1_ri": dm1_ri,
             "dm2_ri": dm2_ri,
         }
     )
+    if not args.r12_only:
+        check_finite_many({"f12sq_ri": f12sq_ri, "f12g12_ri": f12g12_ri, "f12dc_ri": f12dc_ri})
 
     checks = {
         "direct_overlap_error": float(direct_overlap_error),
@@ -298,6 +324,7 @@ def main():
         "small_space_note": "Default s[0,1,2]+p[0] gives 6 spatial orbitals = 12 qubits.",
         "basis_name": args.basis_name,
         "basis_text": basis_text,
+        "r12_only": bool(args.r12_only),
         "ns": int(ns),
         "nao": int(nao),
         "nobs": int(nobs),
@@ -341,9 +368,6 @@ def main():
         "h_ri": h_ri,
         "eri_ri": eri_ri,
         "f12_ri": f12_ri,
-        "f12sq_ri": f12sq_ri,
-        "f12g12_ri": f12g12_ri,
-        "f12dc_ri": f12dc_ri,
         "dm1_obs": dm1_obs,
         "dm2_obs": dm2_obs,
         "dm1_alpha_obs": dm1a_obs,
@@ -363,6 +387,8 @@ def main():
         "Enuc": np.array(enuc),
         "metadata_json": np.array(json.dumps(metadata, indent=2)),
     }
+    if not args.r12_only:
+        save_dict.update({"f12sq_ri": f12sq_ri, "f12g12_ri": f12g12_ri, "f12dc_ri": f12dc_ri})
     save_func = np.savez_compressed if args.save_compressed else np.savez
     save_func(args.out, **save_dict)
     with open(args.json, "w", encoding="utf-8") as f:
