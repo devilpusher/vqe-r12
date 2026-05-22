@@ -45,6 +45,7 @@ step7b_*.json
 step7c_*.json
 step7d_*.json
 step7e_*.json
+step7f_*.json
 
 # Local editor and OS files
 .idea/
