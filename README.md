@@ -31,6 +31,7 @@ RDM, CABS+, F12/R12 integral, and prototype correction workflows.
 - `step6k_audit_paper_tequila_sf2r12.py` maps the paper/Tequila SF-[2]R12 contractions onto the He tensors.
 - `step6l_scan_paper_tequila_convergence.py` scans the audited `paper_tequila_sf2r12` row over fitted-Slater sizes and parent/OBS cases.
 - `step6m_he_r12_correction_pipeline.py` runs the formal He parent-basis SF-[2]R12 correction pipeline.
+- `step7a_export_ecg_no_data.py` exports local ECG-NO alpha-beta geminal data as Step-compatible spin-free RDMs.
 
 ## Environment
 
@@ -89,6 +90,7 @@ python step6j_audit_closed_shell_sp_factors.py
 python step6k_audit_paper_tequila_sf2r12.py
 python step6l_scan_paper_tequila_convergence.py
 python step6m_he_r12_correction_pipeline.py
+python step7a_export_ecg_no_data.py
 ```
 
 Generated `.npz`, `.out`, summary, and comparison files are ignored by Git.

@@ -27,9 +27,10 @@ SCRIPTS := \
 	step6j_audit_closed_shell_sp_factors.py \
 	step6k_audit_paper_tequila_sf2r12.py \
 	step6l_scan_paper_tequila_convergence.py \
-	step6m_he_r12_correction_pipeline.py
+	step6m_he_r12_correction_pipeline.py \
+	step7a_export_ecg_no_data.py
 
-.PHONY: env update-env check step1 step2 step3 step4b step5a step5b step5c step6a step6b step6c step6d step6e step6f step6g step6h step6i step6j step6k step6l step6m clean
+.PHONY: env update-env check step1 step2 step3 step4b step5a step5b step5c step6a step6b step6c step6d step6e step6f step6g step6h step6i step6j step6k step6l step6m step7a clean
 
 env:
 	conda env create -f environment.yml
@@ -100,5 +101,8 @@ step6l:
 step6m:
 	$(PYTHON) step6m_he_r12_correction_pipeline.py
 
+step7a:
+	$(PYTHON) step7a_export_ecg_no_data.py
+
 clean:
-	rm -f *.npz *.npy *.out *_summary.txt *.csv step6a_slater_fit_N*.json step6b*_fit_convergence.json step6b*_fit_convergence.txt step6b_slater_scan.json step6b_slater_scan.txt step6l_*_scan.json
+	rm -f *.npz *.npy *.out *_summary.txt *.csv step6a_slater_fit_N*.json step6b*_fit_convergence.json step6b*_fit_convergence.txt step6b_slater_scan.json step6b_slater_scan.txt step6l_*_scan.json step7a_*_export.json

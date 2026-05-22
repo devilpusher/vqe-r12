@@ -115,6 +115,54 @@ dominant pair weights   = s-s 0.9958613451, p-p 0.0040001390, d-d 0.0001385160
 leading geminal weight  = 0.9919334806
 ```
 
+## Export Step-7a RDM Handoff
+
+After `he_2rdm_compare_matrices.npz` exists, export the selected ECG-NO method
+to the Step-compatible spin-free RDM convention:
+
+```bash
+cd ~/code/vqe-r12
+conda activate vqecodex
+python step7a_export_ecg_no_data.py
+```
+
+Default input:
+
+```text
+local_external/he-sin/he_2rdm_compare_matrices.npz
+```
+
+Default output:
+
+```text
+step7a_ecg_no_fci_ecg_no_export.npz
+step7a_ecg_no_fci_ecg_no_export_summary.txt
+```
+
+The export includes:
+
+```text
+pair_coeff_ab
+dm1_obs
+dm2_obs
+dm1a_obs
+dm1b_obs
+labels
+ao_channels
+metrics_json
+```
+
+Current Step-7a checks:
+
+```text
+||Cab||                      = 1.000000000000
+Max|Cab-Cab.T|               = 6.044e-17
+Max|dm1-gamma_spatial_input| = 0.000e+00
+Tr(dm1)-2                    = -2.220e-16
+Tr(dm2)-2                    = -2.220e-16
+dm2 bra-ket error            = 0.000e+00
+```
+
 ## Planned R12 Handoff
 
 The R12 side now has a clean formal He correction entry point:
