@@ -34,6 +34,7 @@ step6b*_fit_convergence.json
 step6b*_fit_convergence.txt
 step6b_slater_scan.json
 step6b_slater_scan.txt
+step6l_*_scan.json
 
 # Local editor and OS files
 .idea/

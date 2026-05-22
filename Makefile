@@ -23,9 +23,10 @@ SCRIPTS := \
 	step6h_correlation_factor_sign_probe.py \
 	step6i_audit_sp_normalization.py \
 	step6j_audit_closed_shell_sp_factors.py \
-	step6k_audit_paper_tequila_sf2r12.py
+	step6k_audit_paper_tequila_sf2r12.py \
+	step6l_scan_paper_tequila_convergence.py
 
-.PHONY: env update-env check step1 step2 step3 step4b step5a step5b step5c step6a step6b step6c step6d step6e step6f step6g step6h step6i step6j step6k clean
+.PHONY: env update-env check step1 step2 step3 step4b step5a step5b step5c step6a step6b step6c step6d step6e step6f step6g step6h step6i step6j step6k step6l clean
 
 env:
 	conda env create -f environment.yml
@@ -90,5 +91,8 @@ step6j:
 step6k:
 	$(PYTHON) step6k_audit_paper_tequila_sf2r12.py
 
+step6l:
+	$(PYTHON) step6l_scan_paper_tequila_convergence.py
+
 clean:
-	rm -f *.npz *.npy *.out *_summary.txt *.csv step6a_slater_fit_N*.json step6b*_fit_convergence.json step6b*_fit_convergence.txt step6b_slater_scan.json step6b_slater_scan.txt
+	rm -f *.npz *.npy *.out *_summary.txt *.csv step6a_slater_fit_N*.json step6b*_fit_convergence.json step6b*_fit_convergence.txt step6b_slater_scan.json step6b_slater_scan.txt step6l_*_scan.json
