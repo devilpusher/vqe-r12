@@ -39,10 +39,10 @@ from step6g_audit_approxc_terms import (
     orbital_energy_audit,
     pair_index,
 )
-from step6k_audit_paper_tequila_sf2r12 import (
+from r12_correction import (
     build_fock_tequila,
     chem_to_phys,
-    compute_tequila_style_components,
+    compute_sf2r12_components,
 )
 
 
@@ -287,7 +287,7 @@ def paper_tequila_sf2r12_rows(
         ("tequila_fock_from_paper_formula", tequila_fock),
         ("step5a_generalized_fock_comparison", step5a_fock),
     ]:
-        components = compute_tequila_style_components(g_phys, r_phys, fock, dm1_obs, dm2_obs, nobs, nri)
+        components = compute_sf2r12_components(g_phys, r_phys, fock, dm1_obs, dm2_obs, nobs, nri)
         delta = components["correction"]
         metrics = energy_metrics(delta, E_obs, E_full)
         rows.append({

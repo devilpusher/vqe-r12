@@ -5,6 +5,8 @@ RDM, CABS+, F12/R12 integral, and prototype correction workflows.
 
 ## Scripts
 
+- `r12_common.py` contains shared parent-basis/RDM/tensor utilities.
+- `r12_correction.py` contains the production-facing He SF-[2]R12 correction API.
 - `step1_psi4_he_detci_rdm_check_v2.py` builds the initial Psi4 DETCI/RDM reference.
 - `step2_he_cabs_plus_check.py` constructs and checks the CABS+ space.
 - `step3_he_f12_integral_probe_v2.py` probes F12 integral availability and metadata.
@@ -28,6 +30,7 @@ RDM, CABS+, F12/R12 integral, and prototype correction workflows.
 - `step6j_audit_closed_shell_sp_factors.py` audits He spin-free pair counting and SP factor budgets.
 - `step6k_audit_paper_tequila_sf2r12.py` maps the paper/Tequila SF-[2]R12 contractions onto the He tensors.
 - `step6l_scan_paper_tequila_convergence.py` scans the audited `paper_tequila_sf2r12` row over fitted-Slater sizes and parent/OBS cases.
+- `step6m_he_r12_correction_pipeline.py` runs the formal He parent-basis SF-[2]R12 correction pipeline.
 
 ## Environment
 
@@ -55,6 +58,17 @@ Run scripts from the repository root so their default input and output file name
 line up:
 
 ```powershell
+python step6m_he_r12_correction_pipeline.py --parent-basis cc-pvdz --nobs 2 --fitN 7
+```
+
+The command above is the current clean entry point for the stabilized He
+parent-basis route. It fits a local Gaussian expansion of the Slater factor,
+runs Step 4b and Step 5a as needed, then emits the selected
+`paper_tequila_sf2r12` correction only.
+
+The older staged checks remain available for auditing and regression work:
+
+```powershell
 python step1_psi4_he_detci_rdm_check_v2.py
 python step2_he_cabs_plus_check.py
 python step3_he_f12_integral_probe_v2.py
@@ -74,6 +88,7 @@ python step6i_audit_sp_normalization.py
 python step6j_audit_closed_shell_sp_factors.py
 python step6k_audit_paper_tequila_sf2r12.py
 python step6l_scan_paper_tequila_convergence.py
+python step6m_he_r12_correction_pipeline.py
 ```
 
 Generated `.npz`, `.out`, summary, and comparison files are ignored by Git.
