@@ -32,7 +32,6 @@ import numpy as np
 
 from r12_common import build_sp_tensor, maxabs, reconstruct_energy, rdm_diagnostics, tensor_diagnostics
 from step6e_build_vxbc_intermediates import default_prefix
-from step6f_he_r12_candidate_energy import as_float, energy_metrics, matching_step4b_path
 
 
 PAPER_PDF = r"D:\vqe\D2CP00247G.pdf"
@@ -56,13 +55,57 @@ def load_metadata(data) -> Dict[str, Any]:
     return json.loads(str(data["metadata_json"]))
 
 
+def matching_step4b_path(inp: str) -> Optional[str]:
+    name = Path(inp).name
+    suffix = "_step5a_r12_intermediates.npz"
+    if not name.endswith(suffix):
+        return None
+    candidate = Path(name[: -len(suffix)] + "_step4b_obs_fci_rdm.npz")
+    return str(candidate) if candidate.exists() else None
+
+
+def as_float(x: Any) -> Optional[float]:
+    if x is None:
+        return None
+    try:
+        return float(x)
+    except Exception:
+        return None
+
+
+def energy_metrics(delta: Optional[float], E_obs: float, E_full: Optional[float]) -> Dict[str, Any]:
+    if delta is None:
+        return {
+            "E_total": None,
+            "residual_to_full_parent_FCI": None,
+            "abs_residual_to_full_mEh": None,
+            "recovery_ratio": None,
+            "overcorrection": None,
+        }
+    E_total = E_obs + delta
+    if E_full is None:
+        residual = None
+        abs_residual_mEh = None
+        recovery = None
+        over = None
+    else:
+        residual = E_total - E_full
+        abs_residual_mEh = abs(residual) * 1000.0
+        gap = E_full - E_obs
+        recovery = delta / gap if abs(gap) > 0.0 else None
+        over = None if recovery is None else recovery > 1.0
+    return {
+        "E_total": E_total,
+        "residual_to_full_parent_FCI": residual,
+        "abs_residual_to_full_mEh": abs_residual_mEh,
+        "recovery_ratio": recovery,
+        "overcorrection": over,
+    }
+
+
 def chem_to_phys(T: np.ndarray) -> np.ndarray:
     """Convert chem/Mulliken (pq|rs) to phys/Dirac <p q|r s> = chem[p,r,q,s]."""
     return np.asarray(T, dtype=float).transpose(0, 2, 1, 3)
-
-
-def s2(A: np.ndarray, axes) -> np.ndarray:
-    return np.take(A, axes, axis=0)
 
 
 def block2(A: np.ndarray, i, j) -> np.ndarray:
@@ -201,7 +244,7 @@ def compute_tequila_style_components(
         "tuay,yz,azqp->tupq",
         block4(r_phys, a, a, p, a),
         rdm1,
-        block4(r_phys, p, a, a, a).transpose(0, 1, 3, 2),
+        block4(r_phys, p, a, a, a),
         optimize=True,
     )
     X_mid = rTUkl_rKLpq - rTUyz_rYZpq - 0.5 * rUTya_rdm1Yz_rAZpq - 0.5 * rTUay_rdm1Yz_rAZqp
@@ -218,7 +261,7 @@ def compute_tequila_style_components(
             rdm2,
             block2(fock, f, a),
             rdm1,
-            block4(r_phys, a, a, p, f).transpose(1, 0, 2, 3),
+            block4(r_phys, a, a, p, f),
             optimize=True,
         )
         -0.5
@@ -243,7 +286,7 @@ def compute_tequila_style_components(
             rdm1,
             rdm1,
             rdm1,
-            block4(r_phys, a, a, p, f).transpose(1, 0, 2, 3),
+            block4(r_phys, a, a, p, f),
             optimize=True,
         )
         + np.einsum(
@@ -281,7 +324,7 @@ def compute_tequila_style_components(
             rdm1,
             rdm1,
             rdm1,
-            block4(r_phys, a, a, p, f).transpose(1, 0, 2, 3),
+            block4(r_phys, a, a, p, f),
             optimize=True,
         )
     )
@@ -289,19 +332,19 @@ def compute_tequila_style_components(
         np.einsum(
             "pqrs,ayqp,vwtu,xrvy,kx,sw,utak",
             t,
-            block4(r_phys, p, a, a, a).transpose(0, 1, 3, 2),
+            block4(r_phys, p, a, a, a),
             t,
             rdm2,
             block2(fock, f, a),
             rdm1,
-            block4(r_phys, a, a, p, f).transpose(1, 0, 2, 3),
+            block4(r_phys, a, a, p, f),
             optimize=True,
         )
         -0.5
         * np.einsum(
             "pqrs,ayqp,vwtu,xrvy,kx,sw,tuak",
             t,
-            block4(r_phys, p, a, a, a).transpose(0, 1, 3, 2),
+            block4(r_phys, p, a, a, a),
             t,
             rdm2,
             block2(fock, f, a),
@@ -312,7 +355,7 @@ def compute_tequila_style_components(
         - np.einsum(
             "pqrs,ayqp,vwtu,kx,ry,sv,xw,tuak",
             t,
-            block4(r_phys, p, a, a, a).transpose(0, 1, 3, 2),
+            block4(r_phys, p, a, a, a),
             t,
             block2(fock, f, a),
             rdm1,
@@ -325,13 +368,13 @@ def compute_tequila_style_components(
         * np.einsum(
             "pqrs,ayqp,vwtu,kx,ry,sv,xw,utak",
             t,
-            block4(r_phys, p, a, a, a).transpose(0, 1, 3, 2),
+            block4(r_phys, p, a, a, a),
             t,
             block2(fock, f, a),
             rdm1,
             rdm1,
             rdm1,
-            block4(r_phys, a, a, p, f).transpose(1, 0, 2, 3),
+            block4(r_phys, a, a, p, f),
             optimize=True,
         )
     )

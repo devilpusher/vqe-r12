@@ -39,6 +39,11 @@ from step6g_audit_approxc_terms import (
     orbital_energy_audit,
     pair_index,
 )
+from step6k_audit_paper_tequila_sf2r12 import (
+    build_fock_tequila,
+    chem_to_phys,
+    compute_tequila_style_components,
+)
 
 
 def parse_args():
@@ -254,6 +259,69 @@ def audited_3c_fix_sp_rows(
     return out
 
 
+def paper_tequila_sf2r12_rows(
+    data,
+    nri: int,
+    nobs: int,
+    E_obs: float,
+    E_full: Optional[float],
+) -> list[Dict[str, Any]]:
+    """Candidate rows following the paper's public Tequila SF-[2]R12 implementation.
+
+    This uses CABS-only passive indices, p = RI minus OBS, and the full
+    V+B+X+Delta spin-free contraction instead of an occupied-pair scalar
+    prefactor model.
+    """
+    h_ri = np.array(data["h_ri"], dtype=float)
+    eri_ri = np.array(data["eri_ri"], dtype=float)
+    f12_ri = np.array(data["f12_ri"], dtype=float)
+    dm1_obs = np.array(data["dm1_obs"], dtype=float)
+    dm2_obs = np.array(data["dm2_obs"], dtype=float)
+    step5a_fock = np.array(data["F_ri"], dtype=float)
+    g_phys = chem_to_phys(eri_ri)
+    r_phys = chem_to_phys(f12_ri)
+    tequila_fock = build_fock_tequila(h_ri, g_phys, dm1_obs, list(range(nobs)), list(range(nri)))
+
+    rows = []
+    for fock_model, fock in [
+        ("tequila_fock_from_paper_formula", tequila_fock),
+        ("step5a_generalized_fock_comparison", step5a_fock),
+    ]:
+        components = compute_tequila_style_components(g_phys, r_phys, fock, dm1_obs, dm2_obs, nobs, nri)
+        delta = components["correction"]
+        metrics = energy_metrics(delta, E_obs, E_full)
+        rows.append({
+            "source": "paper_tequila_sf2r12",
+            "denominator_model": "CABS_only_passive_full_V+B+X+Delta",
+            "denominator_description": (
+                "Paper/Tequila SF-[2]R12 contraction with passive p=RI-OBS and "
+                "correction=sum(V,B,X,Delta_MBeq)."
+            ),
+            "amplitude_model": "SP_tensor_3/8_direct_plus_1/8_exchange",
+            "V_direct": components["V"],
+            "X_direct": components["X"],
+            "B_dc_direct": components["B"],
+            "C_fock_model": components["Delta"],
+            "denominator": components["B"] + components["X"] + components["Delta"],
+            "lambda": 1.0,
+            "delta_E": delta,
+            "V_component": components["V"],
+            "B_component": components["B"],
+            "X_component": components["X"],
+            "Delta_component": components["Delta"],
+            "fock_model": fock_model,
+            "ab_space": "CABS_only_passive_RI_minus_OBS",
+            "passive_indices": list(range(nobs, nri)),
+            "n_passive": nri - nobs,
+            "formula_source": (
+                "D2CP00247G.pdf Eq. (7)-(8); Tequila "
+                "quantumchemistry/f12_corrections/_f12_correction_base.py"
+            ),
+            **metrics,
+        })
+    return rows
+
+
 def finite_checks(arrays: Dict[str, np.ndarray]) -> None:
     for name, arr in arrays.items():
         assert_finite(name, arr)
@@ -350,7 +418,9 @@ def main():
     sources = source_vectors(data, nri, nobs, ints["indices"]["q_ansatz3"])
     rows = candidate_rows(sources, ints["matrices"], E_obs, E_full, args.denom_thresh)
     audited_rows = audited_3c_fix_sp_rows(data, nri, nobs, nocc, E_obs, E_full, args.denom_thresh)
+    paper_rows = paper_tequila_sf2r12_rows(data, nri, nobs, E_obs, E_full)
     rows.extend(audited_rows)
+    rows.extend(paper_rows)
     warnings = bool_warn(rows, args.overrecover_tol)
     closest = closest_rows(rows)
 
@@ -394,13 +464,16 @@ def main():
         "projector_dimensions": projector_dims,
         "candidate_rows": rows,
         "audited_3C_FIX_SP": audited_rows,
+        "paper_tequila_sf2r12": paper_rows,
         "closest_rows_by_abs_residual_mEh": closest,
         "warnings": warnings,
         "important_note": (
             "Step 6f is a He-only candidate-energy ledger using direct f12g12/f12sq/f12dc "
             "tensors as authoritative inputs. The audited_3C_FIX_SP row uses the Step-6g "
-            "B_fock_q3 + tilde V/B + occupied-pair-block path. Other rows involving "
-            "C_fock_model remain denominator diagnostics."
+            "B_fock_q3 + tilde V/B + occupied-pair-block path. The paper_tequila_sf2r12 "
+            "row follows the paper/Tequila SF-[2]R12 contraction with CABS-only passive "
+            "indices and full V+B+X+Delta. Other rows involving C_fock_model remain "
+            "denominator diagnostics."
         ),
     }
 
@@ -436,6 +509,13 @@ def main():
         "f12_linear_sign",
         "denom_sign",
         "energy_sign",
+        "fock_model",
+        "V_component",
+        "B_component",
+        "X_component",
+        "Delta_component",
+        "n_passive",
+        "formula_source",
     ]
     with open(args.csv, "w", newline="", encoding="utf-8") as f:
         writer = csv.DictWriter(f, fieldnames=fieldnames)
@@ -486,6 +566,18 @@ def main():
             f"| {fmt(audited_row['delta_E'])} "
             f"| {fmt(audited_row['abs_residual_to_full_mEh'], 6)} "
             f"| {fmt(audited_row['recovery_ratio'], 6)} | {flag} |"
+        )
+    lines.append("")
+    lines.append("[Paper/Tequila SF-[2]R12 rows]")
+    lines.append("| source | fock model | passive | V | B | X | Delta | total / Eh | residual / mEh | recovery |")
+    lines.append("|---|---|---|---:|---:|---:|---:|---:|---:|---:|")
+    for paper_row in paper_rows:
+        lines.append(
+            f"| {paper_row['source']} | {paper_row['fock_model']} | {paper_row['ab_space']} "
+            f"| {fmt(paper_row['V_component'])} | {fmt(paper_row['B_component'])} "
+            f"| {fmt(paper_row['X_component'])} | {fmt(paper_row['Delta_component'])} "
+            f"| {fmt(paper_row['delta_E'])} | {fmt(paper_row['abs_residual_to_full_mEh'], 6)} "
+            f"| {fmt(paper_row['recovery_ratio'], 6)} |"
         )
     lines.append("")
     lines.append("[Candidate energy rows]")
