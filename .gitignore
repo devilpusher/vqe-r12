@@ -42,6 +42,7 @@ step6b_slater_scan.txt
 step6l_*_scan.json
 step7a_*_export.json
 step7b_*.json
+step7c_*.json
 
 # Local editor and OS files
 .idea/
