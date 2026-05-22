@@ -18,6 +18,11 @@ env/
 htmlcov/
 
 # Scientific/generated outputs
+local_external/
+he-sin/
+*.exe
+*.o
+*.mod
 *.npz
 *.npy
 *.out
