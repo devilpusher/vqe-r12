@@ -35,9 +35,7 @@ from step6e_build_vxbc_intermediates import ansatz3_indices, build_intermediate_
 from step6g_audit_approxc_terms import (
     ab_space_indices,
     build_formula_matrices,
-    build_tilde_terms,
-    energy_components,
-    make_unit_pair,
+    convention_variant_rows,
     orbital_energy_audit,
     pair_index,
 )
@@ -184,7 +182,7 @@ def candidate_rows(
     return rows
 
 
-def audited_3c_fix_sp_row(
+def audited_3c_fix_sp_rows(
     data,
     nri: int,
     nobs: int,
@@ -203,48 +201,57 @@ def audited_3c_fix_sp_row(
     spaces = ab_space_indices(nri, nobs, nocc)
     ab_idx = spaces["ri_external"]
     kl_idx = np.array([pair_index(k, l, nri) for k in range(nocc) for l in range(nocc)], dtype=int)
-    terms = build_tilde_terms(
+    variants = convention_variant_rows(
         built["matrices"],
         eps,
-        i=0,
-        j=0,
-        kl_indices=kl_idx,
-        ab_indices=ab_idx,
-        n=nri,
-        thresh=thresh,
-        B_source="B_fock_q3",
+        0,
+        0,
+        kl_idx,
+        ab_idx,
+        nri,
+        thresh,
     )
-    T_sp = make_unit_pair(nocc, 0, 0, 0.5)
-    comp = energy_components(T_sp, terms)
-    metrics = energy_metrics(comp["delta_E_candidate"], E_obs, E_full)
-    V_tilde_norm = float(np.linalg.norm(terms["V_tilde"]))
-    B_tilde_norm = float(np.linalg.norm(terms["B_tilde"]))
-    return {
-        "source": "audited_3C_FIX_SP",
-        "denominator_model": "tilde_B_fock_q3_ri_external",
-        "denominator_description": "6g audited tilde terms with RI-external ab space and B_fock_q3",
-        "amplitude_model": "SP_fixed_3/8_plus_1/8",
-        "V_direct": float(terms["V_block"][0]) if terms["V_block"].size else 0.0,
-        "X_direct": float(terms["X_block"][0, 0]) if terms["X_block"].size else 0.0,
-        "B_dc_direct": 0.0,
-        "C_fock_model": float(np.linalg.norm(terms["C_kl_ab"])),
-        "denominator": float(terms["B_tilde"][0, 0]) if terms["B_tilde"].size else 0.0,
-        "lambda": 1.0,
-        "delta_E": comp["delta_E_candidate"],
-        "linear_2T_Vtilde": comp["linear_2T_Vtilde"],
-        "quadratic_T_Btilde_T": comp["quadratic_T_Btilde_T"],
-        "V_tilde_norm": V_tilde_norm,
-        "B_tilde_norm": B_tilde_norm,
-        "C_kl_ab_norm": float(np.linalg.norm(terms["C_kl_ab"])),
-        "C_over_den_V_norm": float(np.linalg.norm(terms["C_over_den_V"])),
-        "C_over_den_B_norm": float(np.linalg.norm(terms["C_over_den_B"])),
-        "ab_space": "ri_external",
-        "B_source": "B_fock_q3",
-        "occupied_pair_block": [[0, 0]],
-        "n_skipped_denominators": int(terms["n_skipped_denominators"]),
-        "epsilon_source": eps_info["epsilon_source"],
-        **metrics,
+
+    selected = {
+        "formula_baseline": "audited_3C_FIX_SP_formula_baseline",
+        "flip_f12_linear_terms": "audited_3C_FIX_SP",
     }
+    out = []
+    for variant in variants["rows"]:
+        if variant["name"] not in selected:
+            continue
+        metrics = energy_metrics(variant["delta_E_candidate"], E_obs, E_full)
+        out.append({
+            "source": selected[variant["name"]],
+            "denominator_model": f"tilde_B_fock_q3_ri_external__{variant['name']}",
+            "denominator_description": variant["description"],
+            "amplitude_model": "SP_fixed_3/8_plus_1/8",
+            "V_direct": float(variant["V_tilde"][0]) if variant["V_tilde"] else 0.0,
+            "X_direct": 0.0,
+            "B_dc_direct": 0.0,
+            "C_fock_model": variant["C_over_den_B_norm"],
+            "denominator": variant["B_tilde_norm"],
+            "lambda": 1.0,
+            "delta_E": variant["delta_E_candidate"],
+            "linear_2T_Vtilde": variant["linear_2T_Vtilde_before_energy_sign"],
+            "quadratic_T_Btilde_T": variant["quadratic_T_Btilde_T_before_energy_sign"],
+            "V_tilde_norm": float(np.linalg.norm(np.array(variant["V_tilde"], dtype=float))),
+            "B_tilde_norm": variant["B_tilde_norm"],
+            "C_kl_ab_norm": None,
+            "C_over_den_V_norm": float(np.linalg.norm(np.array(variant["C_over_den_V"], dtype=float))),
+            "C_over_den_B_norm": variant["C_over_den_B_norm"],
+            "ab_space": "ri_external",
+            "B_source": "B_fock_q3",
+            "occupied_pair_block": [[0, 0]],
+            "n_skipped_denominators": int(variant["n_skipped_denominators"]),
+            "epsilon_source": eps_info["epsilon_source"],
+            "convention_variant": variant["name"],
+            "f12_linear_sign": variant["f12_linear_sign"],
+            "denom_sign": variant["denom_sign"],
+            "energy_sign": variant["energy_sign"],
+            **metrics,
+        })
+    return out
 
 
 def finite_checks(arrays: Dict[str, np.ndarray]) -> None:
@@ -342,8 +349,8 @@ def main():
     ints = build_intermediate_matrices(data, nri, nobs, nocc)
     sources = source_vectors(data, nri, nobs, ints["indices"]["q_ansatz3"])
     rows = candidate_rows(sources, ints["matrices"], E_obs, E_full, args.denom_thresh)
-    audited_row = audited_3c_fix_sp_row(data, nri, nobs, nocc, E_obs, E_full, args.denom_thresh)
-    rows.append(audited_row)
+    audited_rows = audited_3c_fix_sp_rows(data, nri, nobs, nocc, E_obs, E_full, args.denom_thresh)
+    rows.extend(audited_rows)
     warnings = bool_warn(rows, args.overrecover_tol)
     closest = closest_rows(rows)
 
@@ -386,7 +393,7 @@ def main():
         "direct_tensor_consistency": direct_consistency,
         "projector_dimensions": projector_dims,
         "candidate_rows": rows,
-        "audited_3C_FIX_SP": audited_row,
+        "audited_3C_FIX_SP": audited_rows,
         "closest_rows_by_abs_residual_mEh": closest,
         "warnings": warnings,
         "important_note": (
@@ -425,6 +432,10 @@ def main():
         "C_over_den_B_norm",
         "ab_space",
         "B_source",
+        "convention_variant",
+        "f12_linear_sign",
+        "denom_sign",
+        "energy_sign",
     ]
     with open(args.csv, "w", newline="", encoding="utf-8") as f:
         writer = csv.DictWriter(f, fieldnames=fieldnames)
@@ -458,22 +469,24 @@ def main():
         f"{direct_consistency['maxabs_direct_f12sq_minus_ff_full_closure']:.3e}"
     )
     lines.append("")
-    lines.append("[Audited 3C(FIX)/SP row]")
-    lines.append("| source | ab space | B source | linear 2T.Vt | quad T.Bt.T | DeltaE / Eh | residual / mEh | recovery | flag |")
-    lines.append("|---|---|---|---:|---:|---:|---:|---:|---|")
-    flag = ""
-    if audited_row["overcorrection"] is True:
-        flag = "over"
-    elif audited_row["recovery_ratio"] is not None and audited_row["recovery_ratio"] < 0.0:
-        flag = "wrong-sign"
-    lines.append(
-        f"| {audited_row['source']} | {audited_row['ab_space']} | {audited_row['B_source']} "
-        f"| {fmt(audited_row['linear_2T_Vtilde'])} "
-        f"| {fmt(audited_row['quadratic_T_Btilde_T'])} "
-        f"| {fmt(audited_row['delta_E'])} "
-        f"| {fmt(audited_row['abs_residual_to_full_mEh'], 6)} "
-        f"| {fmt(audited_row['recovery_ratio'], 6)} | {flag} |"
-    )
+    lines.append("[Audited 3C(FIX)/SP rows]")
+    lines.append("| source | variant | f12 sign | ab space | B source | linear 2T.Vt | quad T.Bt.T | DeltaE / Eh | residual / mEh | recovery | flag |")
+    lines.append("|---|---|---:|---|---|---:|---:|---:|---:|---:|---|")
+    for audited_row in audited_rows:
+        flag = ""
+        if audited_row["overcorrection"] is True:
+            flag = "over"
+        elif audited_row["recovery_ratio"] is not None and audited_row["recovery_ratio"] < 0.0:
+            flag = "wrong-sign"
+        lines.append(
+            f"| {audited_row['source']} | {audited_row['convention_variant']} "
+            f"| {audited_row['f12_linear_sign']:.0f} | {audited_row['ab_space']} | {audited_row['B_source']} "
+            f"| {fmt(audited_row['linear_2T_Vtilde'])} "
+            f"| {fmt(audited_row['quadratic_T_Btilde_T'])} "
+            f"| {fmt(audited_row['delta_E'])} "
+            f"| {fmt(audited_row['abs_residual_to_full_mEh'], 6)} "
+            f"| {fmt(audited_row['recovery_ratio'], 6)} | {flag} |"
+        )
     lines.append("")
     lines.append("[Candidate energy rows]")
     lines.append(
