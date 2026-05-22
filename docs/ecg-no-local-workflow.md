@@ -163,6 +163,51 @@ Tr(dm2)-2                    = -2.220e-16
 dm2 bra-ket error            = 0.000e+00
 ```
 
+## Export Step-7b ECG-NO Orbitals And AO Audit
+
+After the NO coefficient files exist, rebuild the ECG-NO orbital coefficient
+matrix and compare the PySCF and Psi4 AO overlaps:
+
+```bash
+cd ~/code/vqe-r12
+conda activate vqecodex
+python step7b_export_ecg_no_orbitals.py
+```
+
+Default output:
+
+```text
+step7b_ecg_no_orbitals.npz
+step7b_ecg_no_orbitals_summary.txt
+```
+
+The export includes:
+
+```text
+C_obs_pyscf
+C_obs_psi4_same_order
+S_pyscf
+S_psi4
+labels
+basis_text
+metadata_json
+```
+
+Current Step-7b checks for the selected `s[0,1,2] p[0,1] d[0]` ECG-NO space:
+
+```text
+ns / nao / nobs                   = 16 / 144 / 14
+Max|C_obs^T S_pyscf C_obs - I|    = 7.108e-16
+Max|S_pyscf - S_psi4|             = 1.110e-15
+sorted overlap eigenvalue error   = 7.550e-15
+Max|C_obs^T S_psi4 C_obs - I|     = 8.882e-16
+same AO order supported           = True
+```
+
+This confirms that, for the current even-tempered He basis, the PySCF and Psi4
+AO ordering is directly compatible. Step 7c can use `C_obs_psi4_same_order`
+without an AO permutation/sign correction.
+
 ## Planned R12 Handoff
 
 The R12 side now has a clean formal He correction entry point:

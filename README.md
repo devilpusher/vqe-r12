@@ -32,6 +32,7 @@ RDM, CABS+, F12/R12 integral, and prototype correction workflows.
 - `step6l_scan_paper_tequila_convergence.py` scans the audited `paper_tequila_sf2r12` row over fitted-Slater sizes and parent/OBS cases.
 - `step6m_he_r12_correction_pipeline.py` runs the formal He parent-basis SF-[2]R12 correction pipeline.
 - `step7a_export_ecg_no_data.py` exports local ECG-NO alpha-beta geminal data as Step-compatible spin-free RDMs.
+- `step7b_export_ecg_no_orbitals.py` rebuilds ECG-NO `C_obs` and audits PySCF/Psi4 AO basis ordering.
 
 ## Environment
 
@@ -91,6 +92,7 @@ python step6k_audit_paper_tequila_sf2r12.py
 python step6l_scan_paper_tequila_convergence.py
 python step6m_he_r12_correction_pipeline.py
 python step7a_export_ecg_no_data.py
+python step7b_export_ecg_no_orbitals.py
 ```
 
 Generated `.npz`, `.out`, summary, and comparison files are ignored by Git.
