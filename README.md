@@ -24,6 +24,7 @@ RDM, CABS+, F12/R12 integral, and prototype correction workflows.
 - `step6f_he_r12_candidate_energy.py` writes a He-only candidate [2]R12 energy ledger from direct F12 tensors.
 - `step6g_audit_approxc_terms.py` audits approximation-C/SP tilde terms, denominators, and prefactor variants.
 - `step6h_correlation_factor_sign_probe.py` checks correlation-factor sign conventions.
+- `step6i_audit_sp_normalization.py` audits SP prefactors and closed-shell pair normalization.
 
 ## Environment
 
@@ -66,6 +67,7 @@ python step6e_build_vxbc_intermediates.py
 python step6f_he_r12_candidate_energy.py
 python step6g_audit_approxc_terms.py
 python step6h_correlation_factor_sign_probe.py
+python step6i_audit_sp_normalization.py
 ```
 
 Generated `.npz`, `.out`, summary, and comparison files are ignored by Git.
