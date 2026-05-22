@@ -42,6 +42,19 @@ def as_float(x: Any) -> Optional[float]:
         return None
 
 
+def metadata_energy(meta: Dict[str, Any], key: str, default: Optional[float] = None) -> Optional[float]:
+    """Read energy keys from Step5a-style flat metadata or Step7c nested metadata."""
+    val = as_float(meta.get(key))
+    if val is not None:
+        return val
+    energies = meta.get("energies", {})
+    if isinstance(energies, dict):
+        val = as_float(energies.get(key))
+        if val is not None:
+            return val
+    return default
+
+
 def matching_step4b_path(inp: str) -> Optional[str]:
     name = Path(inp).name
     suffix = "_step5a_r12_intermediates.npz"
@@ -255,14 +268,15 @@ def compute_he_sf2r12_correction(
     step5a_path = str(step5a_path)
     data = np.load(step5a_path, allow_pickle=True)
     meta = load_metadata(data)
-    nobs = int(meta.get("nobs", np.array(data["Cab_obs"]).shape[0]))
+    nobs = int(meta.get("nobs", np.array(data["dm1_obs"]).shape[0]))
     nri = int(meta.get("nri", np.array(data["h_ri"]).shape[0]))
 
     resolved_step4b = str(step4b_path) if step4b_path is not None else matching_step4b_path(step5a_path)
     E_full: Optional[float] = None
     if resolved_step4b is not None and Path(resolved_step4b).exists():
         step4b = np.load(resolved_step4b, allow_pickle=True)
-        E_full = as_float(load_metadata(step4b).get("E_full_parent_fci"))
+        step4b_meta = load_metadata(step4b)
+        E_full = metadata_energy(step4b_meta, "E_full_parent_fci")
 
     h_ri = np.array(data["h_ri"], dtype=float)
     eri_ri = np.array(data["eri_ri"], dtype=float)
@@ -271,8 +285,11 @@ def compute_he_sf2r12_correction(
     dm2_obs = np.array(data["dm2_obs"], dtype=float)
     dm1_ri = np.array(data["dm1_ri"], dtype=float)
     dm2_ri = np.array(data["dm2_ri"], dtype=float)
-    E_obs = float(meta["E_obs_fci"])
-    enuc = float(meta.get("enuc", 0.0))
+    E_obs_val = metadata_energy(meta, "E_obs_fci")
+    if E_obs_val is None:
+        raise KeyError("Cannot find E_obs_fci in metadata or metadata['energies']")
+    E_obs = float(E_obs_val)
+    enuc = float(metadata_energy(meta, "enuc", 0.0) or 0.0)
 
     E_obs_rdm, _, _ = reconstruct_energy(h_ri[:nobs, :nobs], eri_ri[:nobs, :nobs, :nobs, :nobs], dm1_obs, dm2_obs, enuc)
     E_ri_rdm, _, _ = reconstruct_energy(h_ri, eri_ri, dm1_ri, dm2_ri, enuc)
@@ -283,6 +300,8 @@ def compute_he_sf2r12_correction(
     components = compute_sf2r12_components(g_phys, r_phys, fock, dm1_obs, dm2_obs, nobs, nri)
     metrics = energy_metrics(components["correction"], E_obs, E_full)
 
+    fock_step5a = np.array(data["F_ri"], dtype=float) if "F_ri" in data.files else None
+    fock_gap = None if fock_step5a is None else maxabs(fock - fock_step5a)
     diagnostics = {
         "energy_checks": {
             "E_obs_rdm": E_obs_rdm,
@@ -299,7 +318,8 @@ def compute_he_sf2r12_correction(
             "f12_phys": tensor_diagnostics(r_phys),
         },
         "fock_diagnostics": {
-            "maxabs_fock_tequila_minus_step5a": maxabs(fock - np.array(data["F_ri"], dtype=float)),
+            "maxabs_fock_tequila_minus_step5a": fock_gap,
+            "fock_step5a_available": fock_step5a is not None,
             "norm_fock_tequila": float(np.linalg.norm(fock)),
         },
         "sp_ansatz": {
