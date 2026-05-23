@@ -45,6 +45,54 @@ Acceptance signs:
 - 28q is damped enough to avoid the fixed-core overcorrection seen in Step7m.
 - fitN=5/7/9 remains stable.
 
+Cross-system requirements:
+
+- The projector definition must not be tuned only to He singlet.
+- The same `q(n)` rule must be applicable to He singlet, He triplet, Li ground
+  state, and Be ground state.
+- The rule must handle different electron counts and spin sectors.  In
+  spin-free form, the natural occupations should be interpreted relative to the
+  maximum spin-summed occupancy of a spatial orbital.  For closed-shell
+  singlets this maximum is 2; for open-shell or high-spin domains the effective
+  singly occupied orbitals must not be treated as low-occupation virtuals.
+- A viable projector should preserve the cusp-correction role of R12:
+  low-occupation correlation NOs may enter the complementary space
+  fractionally, while physically occupied or singly occupied valence orbitals
+  remain protected from passive-space overcorrection.
+
+Route-1 formula preference:
+
+```text
+P_core/state = state-aware occupied or significant natural-orbital domain
+Q_frac       = CABS + fractional low-occupation NO complement
+q_p          = q(n_p; state, spin, occupancy class)
+```
+
+For He singlet the first tensor-level audit is Step7o:
+
+```text
+q_p = 0 for fixed core OBS
+q_p = model(n_p) for non-core ECG-NO OBS
+q_p = 1 for CABS
+```
+
+Before this becomes a final formula, the fixed-core rule must be replaced by a
+state-aware occupied-domain rule that generalizes to triplet He, Li, and Be.
+
+Next route-1 audit:
+
+```text
+Step7p: state-aware occupation-domain projector design
+```
+
+This should report, before any new R12 tensor contraction:
+
+- spin multiplicity and electron count;
+- spatial NO occupations and occupancy classes;
+- which orbitals are protected occupied/singly occupied domains;
+- which orbitals are fractional complementary NOs;
+- whether the classification is invariant under adding diffuse/correlation NOs.
+
 ## Route 2: RDM Cumulant / Multireference Projector
 
 Fallback if Route 1 still overcorrects or lacks a clean interpretation.
