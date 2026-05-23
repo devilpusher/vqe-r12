@@ -34,7 +34,7 @@ from step7j_scan_residual_weights import parse_fitn
 from step7m_strict_projector_partition_audit import DEFAULT_HE_EXACT_NONREL, case_family
 
 
-MODELS = [
+BASE_MODELS = [
     "linear_occ_fraction",
     "sqrt_occ_fraction",
     "square_occ_fraction",
@@ -51,11 +51,22 @@ def parse_args():
     p.add_argument("--full-policy", default="full_active_cabs_only")
     p.add_argument("--logistic-center", type=float, default=2.5e-4)
     p.add_argument("--logistic-width", type=float, default=7.5e-5)
+    p.add_argument("--rational-alphas", default="1e-4,2.5e-4,5e-4,1e-3")
     p.add_argument("--out-json", default="step7n_fractional_occupation_projector_audit.json")
     p.add_argument("--out-csv", default="step7n_fractional_occupation_projector_audit.csv")
     p.add_argument("--stats-csv", default="step7n_fractional_occupation_projector_audit_stats.csv")
     p.add_argument("--summary", default="step7n_fractional_occupation_projector_audit_summary.txt")
     return p.parse_args()
+
+
+def parse_float_list(s: str) -> List[float]:
+    return [float(x.strip()) for x in s.split(",") if x.strip()]
+
+
+def model_names(args) -> List[str]:
+    names = list(BASE_MODELS)
+    names.extend(f"rational_occ_alpha_{alpha:g}" for alpha in parse_float_list(args.rational_alphas))
+    return names
 
 
 def load_step7m_rows(path: str) -> List[Dict[str, Any]]:
@@ -74,12 +85,15 @@ def lambda_models(low_occ_sum: float, max_low_occ_sum: float, args) -> Dict[str,
     frac = 0.0 if max_low_occ_sum <= 0.0 else min(1.0, max(0.0, low_occ_sum / max_low_occ_sum))
     z = (low_occ_sum - args.logistic_center) / max(args.logistic_width, 1.0e-15)
     logistic = 1.0 / (1.0 + float(np.exp(-z)))
-    return {
+    out = {
         "linear_occ_fraction": frac,
         "sqrt_occ_fraction": float(np.sqrt(frac)),
         "square_occ_fraction": frac * frac,
         "logistic_occ_fraction": logistic,
     }
+    for alpha in parse_float_list(args.rational_alphas):
+        out[f"rational_occ_alpha_{alpha:g}"] = low_occ_sum / (low_occ_sum + alpha)
+    return out
 
 
 def pair_limits(rows: List[Dict[str, Any]], full_policy: str, core_policy: str) -> List[tuple[Dict[str, Any], Dict[str, Any]]]:
@@ -102,7 +116,7 @@ def build_rows(step7m_rows: List[Dict[str, Any]], args) -> List[Dict[str, Any]]:
         lambdas = lambda_models(low_occ, max_low_occ, args)
         delta_full = float(full["delta_E_r12"])
         delta_core = float(core["delta_E_r12"])
-        for model in MODELS:
+        for model in model_names(args):
             lam = lambdas[model]
             delta = (1.0 - lam) * delta_core + lam * delta_full
             E_total = float(full["E_obs"]) + delta
@@ -184,12 +198,15 @@ def write_outputs(args, rows: List[Dict[str, Any]], stats: List[Dict[str, Any]])
                 "source": args.step7m_json,
                 "reference_energy": args.reference_energy,
                 "exact_energy": args.exact_energy,
-                "models": MODELS,
+                "models": model_names(args),
+                "base_models": BASE_MODELS,
+                "rational_alphas": parse_float_list(args.rational_alphas),
                 "rows": rows,
                 "stats": stats,
                 "notes": [
                     "This is a route-1 audit, not the final tensor formula.",
-                    "No external refscale is used; lambda is derived from NO occupation residuals within the scanned data.",
+                    "linear/sqrt/square models are scan-normalized diagnostics.",
+                    "rational_occ_alpha models use only an absolute NO-occupation scale alpha.",
                     "A successful model should avoid full-active quenching and fixed-core overcorrection.",
                 ],
             },
