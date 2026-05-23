@@ -42,9 +42,10 @@ SCRIPTS := \
 	step7l_refscale_sensitivity.py \
 	step7m_strict_projector_partition_audit.py \
 	step7n_fractional_occupation_projector_audit.py \
-	step7o_tensor_fractional_projector_audit.py
+	step7o_tensor_fractional_projector_audit.py \
+	step7p_space_aware_fractional_projector.py
 
-.PHONY: env update-env check step1 step2 step3 step4b step5a step5b step5c step6a step6b step6c step6d step6e step6f step6g step6h step6i step6j step6k step6l step6m step7a step7b step7c step7d step7e step7f step7g step7h step7i step7j step7k step7l step7m step7n step7o clean
+.PHONY: env update-env check step1 step2 step3 step4b step5a step5b step5c step6a step6b step6c step6d step6e step6f step6g step6h step6i step6j step6k step6l step6m step7a step7b step7c step7d step7e step7f step7g step7h step7i step7j step7k step7l step7m step7n step7o step7p clean
 
 env:
 	conda env create -f environment.yml
@@ -160,5 +161,8 @@ step7n:
 step7o:
 	$(PYTHON) step7o_tensor_fractional_projector_audit.py
 
+step7p:
+	$(PYTHON) step7p_space_aware_fractional_projector.py
+
 clean:
-	rm -f *.npz *.npy *.out *_summary.txt *.csv step6a_slater_fit_N*.json step6b*_fit_convergence.json step6b*_fit_convergence.txt step6b_slater_scan.json step6b_slater_scan.txt step6l_*_scan.json step7a_*_export.json step7b_*.json step7c_*.json step7d_*.json step7e_*.json step7f_*.json step7g_*.json step7h_*.json step7i_*.json step7j_*.json step7k_*.json step7l_*.json step7m_*.json step7n_*.json step7o_*.json
+	rm -f *.npz *.npy *.out *_summary.txt *.csv step6a_slater_fit_N*.json step6b*_fit_convergence.json step6b*_fit_convergence.txt step6b_slater_scan.json step6b_slater_scan.txt step6l_*_scan.json step7a_*_export.json step7b_*.json step7c_*.json step7d_*.json step7e_*.json step7f_*.json step7g_*.json step7h_*.json step7i_*.json step7j_*.json step7k_*.json step7l_*.json step7m_*.json step7n_*.json step7o_*.json step7p_*.json
