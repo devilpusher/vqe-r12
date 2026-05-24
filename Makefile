@@ -43,9 +43,26 @@ SCRIPTS := \
 	step7m_strict_projector_partition_audit.py \
 	step7n_fractional_occupation_projector_audit.py \
 	step7o_tensor_fractional_projector_audit.py \
-	step7p_space_aware_fractional_projector.py
+	step7p_space_aware_fractional_projector.py \
+	step8a_export_hem_triplet_data.py \
+	step8b_build_hem_triplet_step4b_like.py \
+	step8c_hem_triplet_r12_correction.py \
+	step8d_audit_same_spin_open_shell_r12.py \
+	step8e_audit_hem_same_spin_failure_source.py \
+	step8f_hem_pauli_suppressed_geminal_audit.py \
+	step8g_scan_hem_suppression_rules.py \
+	step8h_generate_hem_triplet_rdm_space.py \
+	step8i_scan_hem_open_shell_rule_spaces.py \
+	step8j_residual_aware_suppression_audit.py \
+	step8k_hem_pair_channel_v_audit.py \
+	step8l_channel_resolved_same_spin_candidates.py \
+	step8m_internal_qss_v_saturation.py \
+	step8n_scan_qs_saturation_rules.py \
+	step8o_scan_internal_q_shape_rules.py \
+	step8p_hem_same_spin_candidate.py \
+	step8q_physical_q_law_audit.py
 
-.PHONY: env update-env check step1 step2 step3 step4b step5a step5b step5c step6a step6b step6c step6d step6e step6f step6g step6h step6i step6j step6k step6l step6m step7a step7b step7c step7d step7e step7f step7g step7h step7i step7j step7k step7l step7m step7n step7o step7p clean
+.PHONY: env update-env check step1 step2 step3 step4b step5a step5b step5c step6a step6b step6c step6d step6e step6f step6g step6h step6i step6j step6k step6l step6m step7a step7b step7c step7d step7e step7f step7g step7h step7i step7j step7k step7l step7m step7n step7o step7p step8a step8b step8c step8d step8e step8f step8g step8h step8i step8j step8k step8l step8m step8n step8o step8p step8q clean
 
 env:
 	conda env create -f environment.yml
@@ -164,5 +181,56 @@ step7o:
 step7p:
 	$(PYTHON) step7p_space_aware_fractional_projector.py
 
+step8a:
+	$(PYTHON) step8a_export_hem_triplet_data.py
+
+step8b:
+	$(PYTHON) step8b_build_hem_triplet_step4b_like.py --r12-only
+
+step8c:
+	$(PYTHON) step8c_hem_triplet_r12_correction.py
+
+step8d:
+	$(PYTHON) step8d_audit_same_spin_open_shell_r12.py
+
+step8e:
+	$(PYTHON) step8e_audit_hem_same_spin_failure_source.py
+
+step8f:
+	$(PYTHON) step8f_hem_pauli_suppressed_geminal_audit.py
+
+step8g:
+	$(PYTHON) step8g_scan_hem_suppression_rules.py
+
+step8h:
+	$(PYTHON) step8h_generate_hem_triplet_rdm_space.py
+
+step8i:
+	$(PYTHON) step8i_scan_hem_open_shell_rule_spaces.py
+
+step8j:
+	$(PYTHON) step8j_residual_aware_suppression_audit.py
+
+step8k:
+	$(PYTHON) step8k_hem_pair_channel_v_audit.py
+
+step8l:
+	$(PYTHON) step8l_channel_resolved_same_spin_candidates.py
+
+step8m:
+	$(PYTHON) step8m_internal_qss_v_saturation.py
+
+step8n:
+	$(PYTHON) step8n_scan_qs_saturation_rules.py
+
+step8o:
+	$(PYTHON) step8o_scan_internal_q_shape_rules.py
+
+step8p:
+	$(PYTHON) step8p_hem_same_spin_candidate.py
+
+step8q:
+	$(PYTHON) step8q_physical_q_law_audit.py
+
 clean:
-	rm -f *.npz *.npy *.out *_summary.txt *.csv step6a_slater_fit_N*.json step6b*_fit_convergence.json step6b*_fit_convergence.txt step6b_slater_scan.json step6b_slater_scan.txt step6l_*_scan.json step7a_*_export.json step7b_*.json step7c_*.json step7d_*.json step7e_*.json step7f_*.json step7g_*.json step7h_*.json step7i_*.json step7j_*.json step7k_*.json step7l_*.json step7m_*.json step7n_*.json step7o_*.json step7p_*.json
+	rm -f *.npz *.npy *.out *_summary.txt *.csv step6a_slater_fit_N*.json step6b*_fit_convergence.json step6b*_fit_convergence.txt step6b_slater_scan.json step6b_slater_scan.txt step6l_*_scan.json step7a_*_export.json step7b_*.json step7c_*.json step7d_*.json step7e_*.json step7f_*.json step7g_*.json step7h_*.json step7i_*.json step7j_*.json step7k_*.json step7l_*.json step7m_*.json step7n_*.json step7o_*.json step7p_*.json step8a_*.json step8b_*.json step8c_*.json step8d_*.json step8e_*.json step8f_*.json step8g_*.json step8h_*.json step8i_*.json step8j_*.json step8k_*.json step8l_*.json step8m_*.json step8n_*.json step8o_*.json step8p_*.json step8q_*.json

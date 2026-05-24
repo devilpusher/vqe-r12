@@ -20,6 +20,7 @@ htmlcov/
 # Scientific/generated outputs
 local_external/
 he-sin/
+he-meta/
 *.exe
 *.o
 *.mod
@@ -56,6 +57,23 @@ step7m_*.json
 step7n_*.json
 step7o_*.json
 step7p_*.json
+step8a_*.json
+step8b_*.json
+step8c_*.json
+step8d_*.json
+step8e_*.json
+step8f_*.json
+step8g_*.json
+step8h_*.json
+step8i_*.json
+step8j_*.json
+step8k_*.json
+step8l_*.json
+step8m_*.json
+step8n_*.json
+step8o_*.json
+step8p_*.json
+step8q_*.json
 
 # Local editor and OS files
 .idea/
