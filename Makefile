@@ -60,9 +60,50 @@ SCRIPTS := \
 	step8n_scan_qs_saturation_rules.py \
 	step8o_scan_internal_q_shape_rules.py \
 	step8p_hem_same_spin_candidate.py \
-	step8q_physical_q_law_audit.py
+	step8q_physical_q_law_audit.py \
+	step9a_export_li_ecg_no_rdm_space.py \
+	step9b_build_li_step4b_like.py \
+	step9c_li_r12_correction.py \
+	step9d_scan_li_selected_spaces.py \
+	step9e_li_pair_channel_audit.py \
+	step10a_export_be_ecg_no_rdm_space.py \
+	step10b_build_be_step4b_like.py \
+	step10c_be_r12_correction.py \
+	step10d_scan_be_selected_spaces.py \
+	step10e_be_pair_channel_audit.py \
+	step11_cross_system_summary.py
 
-.PHONY: env update-env check step1 step2 step3 step4b step5a step5b step5c step6a step6b step6c step6d step6e step6f step6g step6h step6i step6j step6k step6l step6m step7a step7b step7c step7d step7e step7f step7g step7h step7i step7j step7k step7l step7m step7n step7o step7p step8a step8b step8c step8d step8e step8f step8g step8h step8i step8j step8k step8l step8m step8n step8o step8p step8q clean
+FINAL_SCRIPTS := \
+	r12_common.py \
+	r12_correction.py \
+	step7a_export_ecg_no_data.py \
+	step7b_export_ecg_no_orbitals.py \
+	step7c_build_ecg_no_step4b_like.py \
+	step7d_ecg_no_r12_correction.py \
+	step7e_scan_ecg_no_r12_convergence.py \
+	step8a_export_hem_triplet_data.py \
+	step8b_build_hem_triplet_step4b_like.py \
+	step8c_hem_triplet_r12_correction.py \
+	step8e_audit_hem_same_spin_failure_source.py \
+	step8h_generate_hem_triplet_rdm_space.py \
+	step8i_scan_hem_open_shell_rule_spaces.py \
+	step8n_scan_qs_saturation_rules.py \
+	step8o_scan_internal_q_shape_rules.py \
+	step8p_hem_same_spin_candidate.py \
+	step8q_physical_q_law_audit.py \
+	step9a_export_li_ecg_no_rdm_space.py \
+	step9b_build_li_step4b_like.py \
+	step9c_li_r12_correction.py \
+	step9d_scan_li_selected_spaces.py \
+	step9e_li_pair_channel_audit.py \
+	step10a_export_be_ecg_no_rdm_space.py \
+	step10b_build_be_step4b_like.py \
+	step10c_be_r12_correction.py \
+	step10d_scan_be_selected_spaces.py \
+	step10e_be_pair_channel_audit.py \
+	step11_cross_system_summary.py
+
+.PHONY: env update-env check check-final final-summary step1 step2 step3 step4b step5a step5b step5c step6a step6b step6c step6d step6e step6f step6g step6h step6i step6j step6k step6l step6m step7a step7b step7c step7d step7e step7f step7g step7h step7i step7j step7k step7l step7m step7n step7o step7p step8a step8b step8c step8d step8e step8f step8g step8h step8i step8j step8k step8l step8m step8n step8o step8p step8q step9a step9b step9c step9d step9e step10a step10b step10c step10d step10e step11 clean
 
 env:
 	conda env create -f environment.yml
@@ -72,6 +113,12 @@ update-env:
 
 check:
 	$(PYTHON) -m py_compile $(SCRIPTS)
+
+check-final:
+	$(PYTHON) -m py_compile $(FINAL_SCRIPTS)
+
+final-summary:
+	$(PYTHON) step11_cross_system_summary.py --prefix step11_cross_system_summary
 
 step1:
 	$(PYTHON) step1_psi4_he_detci_rdm_check_v2.py
@@ -232,5 +279,38 @@ step8p:
 step8q:
 	$(PYTHON) step8q_physical_q_law_audit.py
 
+step9a:
+	$(PYTHON) step9a_export_li_ecg_no_rdm_space.py
+
+step9b:
+	$(PYTHON) step9b_build_li_step4b_like.py --r12-only
+
+step9c:
+	$(PYTHON) step9c_li_r12_correction.py
+
+step9d:
+	$(PYTHON) step9d_scan_li_selected_spaces.py
+
+step9e:
+	$(PYTHON) step9e_li_pair_channel_audit.py
+
+step10a:
+	$(PYTHON) step10a_export_be_ecg_no_rdm_space.py
+
+step10b:
+	$(PYTHON) step10b_build_be_step4b_like.py --r12-only
+
+step10c:
+	$(PYTHON) step10c_be_r12_correction.py
+
+step10d:
+	$(PYTHON) step10d_scan_be_selected_spaces.py
+
+step10e:
+	$(PYTHON) step10e_be_pair_channel_audit.py
+
+step11:
+	$(PYTHON) step11_cross_system_summary.py
+
 clean:
-	rm -f *.npz *.npy *.out *_summary.txt *.csv step6a_slater_fit_N*.json step6b*_fit_convergence.json step6b*_fit_convergence.txt step6b_slater_scan.json step6b_slater_scan.txt step6l_*_scan.json step7a_*_export.json step7b_*.json step7c_*.json step7d_*.json step7e_*.json step7f_*.json step7g_*.json step7h_*.json step7i_*.json step7j_*.json step7k_*.json step7l_*.json step7m_*.json step7n_*.json step7o_*.json step7p_*.json step8a_*.json step8b_*.json step8c_*.json step8d_*.json step8e_*.json step8f_*.json step8g_*.json step8h_*.json step8i_*.json step8j_*.json step8k_*.json step8l_*.json step8m_*.json step8n_*.json step8o_*.json step8p_*.json step8q_*.json
+	rm -f *.npz *.npy *.out *_summary.txt *.csv step6a_slater_fit_N*.json step6b*_fit_convergence.json step6b*_fit_convergence.txt step6b_slater_scan.json step6b_slater_scan.txt step6l_*_scan.json step7a_*_export.json step7b_*.json step7c_*.json step7d_*.json step7e_*.json step7f_*.json step7g_*.json step7h_*.json step7i_*.json step7j_*.json step7k_*.json step7l_*.json step7m_*.json step7n_*.json step7o_*.json step7p_*.json step8a_*.json step8b_*.json step8c_*.json step8d_*.json step8e_*.json step8f_*.json step8g_*.json step8h_*.json step8i_*.json step8j_*.json step8k_*.json step8l_*.json step8m_*.json step8n_*.json step8o_*.json step8p_*.json step8q_*.json step9a_*.json step9b_*.json step9c_*.json step9d_*.json step9e_*.json step10a_*.json step10b_*.json step10c_*.json step10d_*.json step10e_*.json step11_*.json step11_*.md

@@ -1,7 +1,13 @@
-# VQE / R12 Helium Prototype Checks
+# VQE / R12 ECG-NO Small-Space Checks
 
-This repository contains a staged set of Python scripts for validating helium
-RDM, CABS+, F12/R12 integral, and prototype correction workflows.
+This repository contains a staged set of Python scripts for validating compact
+ECG-NO selected-space RDM, CABS+/RI bridge, and SF-[2]R12 correction workflows.
+The current article-facing route covers He, metastable He triplet (HEM), Li,
+and Be.
+
+For the cleaned final route, see `docs/final-step-series.md`.  Earlier steps
+remain in the repository as audit history for formula conventions, projector
+tests, and failed or superseded candidate rules.
 
 ## Scripts
 
@@ -33,6 +39,12 @@ RDM, CABS+, F12/R12 integral, and prototype correction workflows.
 - `step6m_he_r12_correction_pipeline.py` runs the formal He parent-basis SF-[2]R12 correction pipeline.
 - `step7a_export_ecg_no_data.py` exports local ECG-NO alpha-beta geminal data as Step-compatible spin-free RDMs.
 - `step7b_export_ecg_no_orbitals.py` rebuilds ECG-NO `C_obs` and audits PySCF/Psi4 AO basis ordering.
+- `step7e_scan_ecg_no_r12_convergence.py` is the current He ECG-NO selected-space scan.
+- `step8p_hem_same_spin_candidate.py` freezes the conservative HEM same-spin candidate rule.
+- `step8q_physical_q_law_audit.py` records the physical q-law audit for HEM.
+- `step9a` through `step9e` validate Li ECG-NO RDMs, build the R12 bridge, scan selected spaces, and audit channels.
+- `step10a` through `step10e` do the same for early Be ECG-NO data.
+- `step11_cross_system_summary.py` reads existing He/HEM/Li/Be outputs and writes the unified no-recompute summary.
 
 ## Environment
 
@@ -59,14 +71,14 @@ by platform and Python version.
 Run scripts from the repository root so their default input and output file names
 line up:
 
-```powershell
-python step6m_he_r12_correction_pipeline.py --parent-basis cc-pvdz --nobs 2 --fitN 7
+```bash
+make check-final
+make final-summary
 ```
 
-The command above is the current clean entry point for the stabilized He
-parent-basis route. It fits a local Gaussian expansion of the Slater factor,
-runs Step 4b and Step 5a as needed, then emits the selected
-`paper_tequila_sf2r12` correction only.
+`make final-summary` does not rerun expensive calculations.  It only reads
+existing JSON/CSV files and regenerates the Step11 cross-system tables and
+notes.
 
 The older staged checks remain available for auditing and regression work:
 
@@ -95,4 +107,6 @@ python step7a_export_ecg_no_data.py
 python step7b_export_ecg_no_orbitals.py
 ```
 
-Generated `.npz`, `.out`, summary, and comparison files are ignored by Git.
+Generated `.npz`, `.npy`, `.out`, summary, JSON, markdown note, and comparison
+files are ignored by Git.  The intent is to push source scripts and lightweight
+documentation, not large intermediate numerical artifacts.

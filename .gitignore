@@ -74,6 +74,18 @@ step8n_*.json
 step8o_*.json
 step8p_*.json
 step8q_*.json
+step9a_*.json
+step9b_*.json
+step9c_*.json
+step9d_*.json
+step9e_*.json
+step10a_*.json
+step10b_*.json
+step10c_*.json
+step10d_*.json
+step10e_*.json
+step11_*.json
+step11_*.md
 
 # Local editor and OS files
 .idea/

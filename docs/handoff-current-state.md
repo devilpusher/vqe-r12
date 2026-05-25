@@ -356,21 +356,273 @@ This shows why a simple monotone damping rule is insufficient: expanding `s`
 strengthens the same-spin s-s correction, expanding `p` damps it, and expanding
 both causes extra cancellation.
 
+## Li Small-Space Step9 Status
+
+The Li ground-state doublet `s01+p0` ECG-NO validation has now been added as
+Step9a/Step9b.
+
+Step9a exports the selected-space Li FCI RDMs directly from the local Li
+ECG-NO construction in `/mnt/d/vqecodex/lino`:
+
+```text
+selection       = s[0,1] + p[0]
+nobs            = 5 spatial orbitals = 10 qubits
+E_FCI           = -7.45432964359971 Eh
+E_RDM           = -7.45432964359972 Eh
+Delta(RDM-FCI)  = -1.776e-15 Eh
+Tr(dm1)         = 3.000000000000
+Tr(dm2)         = 6.000000000000
+Tr(D_pair)      = 3.000000000000
+natural occ     = [1.9967821057, 0.9999844012, 0.0010778310, 0.0010778310, 0.0010778310]
+```
+
+The spin-free spatial RDM convention is therefore internally consistent for
+the three-electron Li case: `Tr(dm2)=N(N-1)=6`, while the spin-orbital unordered
+pair-space trace is `N(N-1)/2=3`.
+
+Step9b builds the Step4b-like Psi4/CABS+/RI bridge for the same Li RDM:
+
+```text
+nobs/ncabs/nri                  = 5 / 59 / 64
+Max|S_pyscf-S_psi4|             = 1.332e-15
+Max|C_obs^T S_pyscf C_obs-I|    = 1.110e-16
+Max|C_obs^T S_psi4 C_obs-I|     = 8.882e-16
+E_input_Li_FCI                  = -7.45432964359971 Eh
+E_OBS_RDM                       = -7.45432964359972 Eh
+E_RI_embedded_RDM               = -7.45432964359972 Eh
+Delta(OBS_RDM-input)            = -4.441e-15 Eh
+Delta(RI_RDM-input)             = -3.553e-15 Eh
+```
+
+This confirms that Li `s01+p0` is now ready for a subsequent small-space R12
+candidate/correction step using the Step9b bridge file:
+
+```text
+step9b_li_sp_s01_p0_fitN7_step4b_like.npz
+```
+
+Step9c applies the first Li small-space SF-[2]R12 correction audit to this
+bridge:
+
+```text
+DeltaE_R12        = -1.534515799953e-02 Eh  (-15.345158 mEh)
+E_OBS_plus_R12    = -7.46967480159924 Eh
+V                 = -2.155821177883e-02 Eh
+B                 =  4.285916124540e-03 Eh
+X                 =  2.850929727860e-03 Eh
+Delta             = -9.237920731023e-04 Eh
+```
+
+This is a validated contraction/audit result, not yet a promoted Li/Be physical
+law.  The diagnostics pass the Li three-electron conventions:
+
+```text
+Delta OBS-RDM minus FCI = -4.441e-15 Eh
+Delta RI-RDM minus FCI  = -3.553e-15 Eh
+Tr(dm1), Tr(dm2)        = 3.000000000000, 6.000000000000
+```
+
+Step9d scans four Li selected spaces at `fitN=7` against the local Li ECG
+reference `-7.47806002667149 Eh`:
+
+```text
+case           nobs      E_obs              dR12/mEh     E_obs+R12          recovery   residual/mEh
+sp_s01_p0         5   -7.454329643600     -15.345158   -7.469674801599    0.646646     8.385225
+sp_s012_p0        6   -7.468625421019      -3.436386   -7.472061807283    0.364232     5.998219
+sp_s01_p01        8   -7.455919693371     -13.742070   -7.469661763378    0.620680     8.398263
+sp_s012_p01       9   -7.470147641235      -2.474123   -7.472621764326    0.312690     5.438262
+```
+
+Component scan, in mEh:
+
+```text
+case                 V          B          X      Delta
+sp_s01_p0      -21.558212   4.285916   2.850930  -0.923792
+sp_s012_p0      -5.067714   1.367265   0.733136  -0.469074
+sp_s01_p01     -19.328159   3.451605   3.001846  -0.867362
+sp_s012_p01     -3.860409   1.082390   0.708909  -0.405013
+```
+
+Main Step9d reading: adding the third `s` radial NO is the dominant Li
+selected-space improvement and reduces the R12 correction magnitude by roughly
+a factor of four to six.  Adding the second `p` radial NO gives a much smaller
+OBS improvement and only moderately screens the correction.  This supports a
+first physical interpretation that the Li small-space correction is mostly
+radial/core-valence cusp recovery, with p-space acting as angular screening.
+
+Step9e confirms this interpretation by decomposing the spin-free R12 V
+numerator and the spin-orbital pair populations:
+
+```text
+case            V_total/mEh    V_s-s       V_s-p      V_p-p      ab_frac   ss_pair_frac
+sp_s01_p0        -21.558212  -25.368107   3.992819  -0.182924   0.666667    0.998383
+sp_s012_p0        -5.067714   -6.284523   1.394790  -0.177981   0.666667    0.998419
+sp_s01_p01       -19.328159  -23.359204   4.167205  -0.136160   0.666667    0.998040
+sp_s012_p01       -3.860409   -4.783450   1.051250  -0.128209   0.666667    0.998087
+```
+
+The spin-orbital pair population is overwhelmingly s-s (`~0.998`) with the
+expected Li doublet spin-pair partition (`ab_frac=2/3`).  The R12 V attraction is
+also dominated by s-s.  Adding the third `s` radial NO strongly reduces this
+s-s attraction, while s-p is positive and therefore screens the attraction.
+This gives a compact physical picture for Li: the current R12 correction mostly
+recovers missing short-range radial/core correlation, and p-space acts as an
+angular screening channel rather than as the primary source of attraction.
+
+## Be Small-Space Step10 Status
+
+The Be ground-state singlet work now starts from the local early `exnot13.f90`
+NO data in `/mnt/d/vqecodex/be2`.  The Fortran calculation was not rerun; the
+existing files were used as requested.
+
+The user-specified `be_no_multi.py` validation was run first:
+
+```text
+selection                       = s[0,1,2] + p[0]
+nobs                            = 6 spatial orbitals = 12 qubits
+Max|C^T S C - I|                = 4.441e-16
+Be ECG-NO FCI energy            = -14.619416561534816 Eh
+RHF energy in this GTO basis    = -14.572976726383626 Eh
+10-MO RHF-space FCI             = -14.574417339189374 Eh
+```
+
+Step10a reproduces this ECG-NO selected-space energy and validates the
+four-electron RDM convention:
+
+```text
+E_FCI           = -14.61941656153482 Eh
+E_RDM           = -14.61941656153482 Eh
+Delta(RDM-FCI)  =  7.105e-15 Eh
+Tr(dm1)         = 4.000000000000
+Tr(dm2)         = 12.000000000000
+Tr(D_pair)      = 6.000000000000
+natural occ     = [1.9997039778, 1.8074721795, 0.0637700190, 0.0637700190, 0.0637700190, 0.0015137856]
+```
+
+Step10b builds an s,p parent/CABS bridge for the same Be RDM:
+
+```text
+nobs/ncabs/nri                  = 6 / 58 / 64
+E_input_Be_FCI                  = -14.61941656153482 Eh
+E_OBS_RDM                       = -14.61941656153482 Eh
+E_RI_embedded_RDM               = -14.61941656153481 Eh
+Delta(RI_RDM-input)             =  1.066e-14 Eh
+```
+
+Step10c first Be R12 correction audit:
+
+```text
+DeltaE_R12        = -4.065982041863e-02 Eh  (-40.659820 mEh)
+E_OBS_plus_R12    = -14.66007638195346 Eh
+V                 = -7.500628048618e-02 Eh
+B                 =  2.176096066236e-02 Eh
+X                 =  1.493187702372e-02 Eh
+Delta             = -2.346377618530e-03 Eh
+```
+
+Against the early Be ECG reference from `enerx.dat`,
+`-14.6672938007836 Eh`, the selected-space gap is about `-47.877239 mEh`.
+The first R12 correction recovers about `84.92%` of that gap and leaves
+approximately `7.217419 mEh` residual:
+
+```text
+OBS -> ECG reference gap    = -47.877239 mEh
+R12 correction              = -40.659820 mEh
+R12 residual to reference   =   7.217419 mEh
+```
+
+This is a stronger effect than Li, as expected for a compact Be closed-shell
+small space with missing short-range radial/core correlation.  Because the Be
+NO data are explicitly early/incomplete, these results should be treated as a
+first stability and interpretability audit rather than a final Be benchmark.
+
+Step10d scans the requested Be selected spaces at `fitN=7`:
+
+```text
+case             nobs      E_obs               dR12/mEh      E_obs+R12           recovery   residual/mEh
+sp_s012_p0          6   -14.619416561535     -40.659820    -14.660076381953    0.849252     7.217419
+sp_s0123_p0         7   -14.632406642677     -26.358356    -14.658764999142    0.755532     8.528802
+sp_s012_p01         9   -14.642047415424     -20.255386    -14.662302801427    0.802308     4.990999
+sp_s0123_p01       10   -14.654774790248      -6.745181    -14.661519970827    0.538795     5.773830
+```
+
+Component scan, in mEh:
+
+```text
+case                  V          B          X       Delta
+sp_s012_p0      -75.006280  21.760961  14.931877  -2.346378
+sp_s0123_p0     -54.944110  17.691221  12.276174  -1.381641
+sp_s012_p01     -29.241876   7.295663   4.189619  -2.498792
+sp_s0123_p01    -10.175169   3.401208   1.492073  -1.463293
+```
+
+Main Step10d reading: Be shows a much larger raw R12 correction than Li in the
+compact `s012+p0` space, recovering about `85%` of the early ECG reference gap.
+The second p radial shell is important for Be: `s012+p01` gives the best
+residual among these four cases (`~4.99 mEh`).  Adding the fourth s shell
+improves OBS substantially but also reduces the R12 correction, giving a
+slightly larger residual in this early-data scan.  This suggests Be has stronger
+angular/shell-coupling sensitivity than Li, so the next Be interpretation step
+should decompose V by s-s/s-p/p-p channels as in Li Step9e.
+
+Step10e decomposes Be's spin-free R12 V numerator and spin-orbital pair
+populations:
+
+```text
+case             V_total/mEh    V_s-s       V_s-p      V_p-p      ab_frac   ss_pair_frac
+sp_s012_p0        -75.006280  -74.928532   1.089961  -1.167709   0.666667    0.920288
+sp_s0123_p0       -54.944110  -54.869622   1.014931  -1.089418   0.666667    0.921427
+sp_s012_p01       -29.241876  -31.751580   3.127521  -0.617817   0.666667    0.920387
+sp_s0123_p01      -10.175169  -11.705955   2.080498  -0.549712   0.666667    0.921454
+```
+
+Be is still strongly s-s dominated in the V attraction, but less purely so than
+Li: the s-s pair fraction is about `0.92` rather than Li's `~0.998`.  The
+closed-shell spin-pair partition is correct (`ab_frac=2/3`, with aa/bb each
+about 1/6 in the detailed spin CSV).  Adding `p01` strongly reduces the s-s V
+attraction and the s-p term is positive, so p space acts as angular screening.
+The Be interpretation is therefore: large closed-shell s-s radial/core recovery,
+with materially stronger p-shell screening than Li.
+
+## Step11 Cross-System Summary
+
+`step11_cross_system_summary.py` is now the no-recompute cross-system collector.
+It only reads existing He/HEM/Li/Be JSON/CSV outputs and writes a unified JSON,
+system CSV, selected-space CSV, markdown notes, and terminal-style summary.  It
+does not rerun FCI, Psi4, R12 contractions, or the external Li/Be Fortran
+workflows.
+
+Current representative rows from
+`python step11_cross_system_summary.py --prefix step11_cross_system_summary`:
+
+```text
+system  representative       dR12/mEh    recovery   residual/mEh
+He      sp_s012_p0          -2.011204    0.589431      1.400907
+HEM     stress scan          mean residual 0.000233, max residual 0.000327
+Li      sp_s012_p01         -2.474123    0.312690      5.438262
+Be      sp_s012_p01        -20.255386    0.802308      4.990999
+```
+
+The condensed physical statement is: compact ECG-NO selected spaces can be
+augmented by a channel-resolved R12 correction with a consistent interpretation
+across systems.  He is the closed-shell two-electron opposite-spin cusp sanity
+check; HEM isolates the Pauli-suppressed same-spin edge case; Li keeps an
+open-shell but still mainly s-s radial/core recovery character; Be shows the
+same s-s recovery with stronger p-shell angular screening.
+
 ## Suggested Next Step
 
-Continue HEM validation before promoting a formula:
+For the cross-system article goal, continue from the validated small spaces:
 
-1. Derive a revised internal q rule that handles the 4-to-6 radial extrapolation.
-2. Decide the promotion criterion: worst-case suggests
-   `q_shape_a0.80_b0.35_pf0.76_c1.00`; mean residual suggests
-   `q_shape_a0.80_b0.45_pf0.76_c1.00`.
-3. If proceeding conservatively, use Step8p's
+1. Use Step11 as the single source for the current cross-system table and
+   article-facing wording.
+2. Keep HEM conservative: use Step8p's
    `hem_q_shape_worst_case_ss_only` as the named HEM same-spin candidate.
-4. Use Step8q's three-factor reading as the physical explanation if promoting
+3. Use Step8q's three-factor reading as the physical explanation if promoting
    Step8p.
-5. Keep `q_vsat_self_count_ss_only` only as an audit comparison.
-6. Do not move to Li/Be or triplet production until HEM Step8 consistency is
-   settled.
+4. If final quantitative claims are needed, run fitN=5/7/9 stability for the
+   representative Li/Be spaces; keep Be labeled as early exnot13 data until the
+   optimized Be NO run is available.
 
 ## Verification Already Run
 
@@ -399,5 +651,18 @@ python step8q_physical_q_law_audit.py --fitN 9 --prefix step8q_hem_physical_q_la
 python step8i_scan_hem_open_shell_rule_spaces.py --fitN 7 --memory "4 GB" --nthreads 1 --prefix step8i_hem_triplet_open_shell_space_scan_stress_fitN7
 python step8p_hem_same_spin_candidate.py --fitN 7 --prefix step8p_hem_same_spin_candidate_stress_fitN7
 python step8q_physical_q_law_audit.py --fitN 7 --inp step8p_hem_same_spin_candidate_stress_fitN7.json --prefix step8q_hem_physical_q_law_audit_stress_fitN7
+python step9a_export_li_ecg_no_rdm_space.py --li-dir /mnt/d/vqecodex/lino --s-pick 0,1 --p-pick 0
+python step9b_build_li_step4b_like.py --li-dir /mnt/d/vqecodex/lino --rdm-inp step9a_li_sp_s01_p0_rdm_export.npz --s-pick 0,1 --p-pick 0 --fitN 7 --memory 4 --nthreads 1 --r12-only
+python step9c_li_r12_correction.py --inp step9b_li_sp_s01_p0_fitN7_step4b_like.npz --prefix step9c_li_sp_s01_p0_fitN7
+python step9d_scan_li_selected_spaces.py --li-dir /mnt/d/vqecodex/lino --fitN 7 --memory 4 --nthreads 1 --prefix step9d_li_selected_space_scan_fitN7
+python step9e_li_pair_channel_audit.py --fitN 7 --prefix step9e_li_pair_channel_audit_fitN7
+cd /mnt/d/vqecodex/be2 && python be_no_multi.py
+cd /home/zy/code/vqe-r12
+python step10a_export_be_ecg_no_rdm_space.py --be-dir /mnt/d/vqecodex/be2 --s-pick 0,1,2 --p-pick 0
+python step10b_build_be_step4b_like.py --be-dir /mnt/d/vqecodex/be2 --rdm-inp step10a_be_sp_s012_p0_rdm_export.npz --s-pick 0,1,2 --p-pick 0 --fitN 7 --memory 4 --nthreads 1 --r12-only
+python step10c_be_r12_correction.py --inp step10b_be_sp_s012_p0_fitN7_step4b_like.npz --prefix step10c_be_sp_s012_p0_fitN7
+python step10d_scan_be_selected_spaces.py --be-dir /mnt/d/vqecodex/be2 --fitN 7 --memory 4 --nthreads 1 --prefix step10d_be_selected_space_scan_fitN7
+python step10e_be_pair_channel_audit.py --fitN 7 --prefix step10e_be_pair_channel_audit_fitN7
+python step11_cross_system_summary.py --prefix step11_cross_system_summary
 make check
 ```
